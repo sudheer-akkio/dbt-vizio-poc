@@ -48,52 +48,6 @@ dbt run --select vizio_daily_fact_content_summary
 dbt build --select vizio
 ```
 
-## Testing Framework
-
-This project includes a comprehensive testing framework designed with Databricks engineering best practices.
-
-### Quick Test Commands
-
-```bash
-# Test everything
-dbt test
-
-# Test one model
-dbt test --select vizio_daily_fact_content_summary
-
-# Test by category
-dbt test --select test_name:*has_data              # Data existence
-dbt test --select test_name:*aggregation_integrity # Aggregation accuracy
-dbt test --select test_name:*temporal_consistency  # Timestamp validation
-
-# Run only critical tests
-dbt test --select severity:error
-```
-
-### Test Documentation
-
-- **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Comprehensive testing guide with architecture, best practices, and CI/CD integration
-- **[TEST_QUICK_REFERENCE.md](TEST_QUICK_REFERENCE.md)** - Quick command reference for common testing scenarios
-- **[tests/README.md](tests/README.md)** - Details on singular test organization and writing new tests
-
-### Test Coverage
-
-- ✅ **72+ tests** across 7 models
-- ✅ Generic schema tests (not_null, unique, relationships, etc.)
-- ✅ Aggregation integrity tests (summary vs detail validation)
-- ✅ Temporal consistency tests (timestamp logic validation)
-- ✅ Business logic tests (viewing duration, partition alignment)
-- ✅ Integration tests (cross-model referential integrity)
-
-### Why Use Tests Instead of `dbt run`?
-
-Tests allow you to:
-- ✅ Validate model correctness without rebuilding
-- ✅ Run faster (seconds vs minutes)
-- ✅ Test specific models in isolation
-- ✅ Catch data quality issues early
-- ✅ Integrate easily into CI/CD pipelines
-
 ## Project Structure
 
 ```
@@ -109,18 +63,8 @@ dbt-vizio-poc/
 │   ├── vizio_campaign_attribution.sql
 │   └── vizio_attributes_latest.sql
 ├── tests/                     # Singular SQL tests
-│   ├── README.md              # Test organization guide
-│   ├── test_*_has_data.sql    # Data existence tests
-│   ├── test_*_aggregation_integrity.sql  # Summary validation tests
-│   ├── test_*_temporal_consistency.sql   # Timestamp tests
-│   └── test_*.sql             # Business logic tests
-├── macros/                    # Custom test macros
-│   ├── test_row_count_threshold.sql
-│   └── test_recent_data.sql
 ├── packages.yml               # dbt package dependencies
 ├── dbt_project.yml            # Project configuration
-├── TESTING_GUIDE.md           # Comprehensive testing documentation
-├── TEST_QUICK_REFERENCE.md    # Quick test commands
 └── VIZIO_MODELS_README.md     # Model documentation
 
 ```
@@ -151,35 +95,6 @@ dbt-vizio-poc/
 
 ## Development Workflow
 
-### Working on a Model
-
-```bash
-# 1. Make changes to model
-vim models/vizio/vizio_daily_fact_content_summary.sql
-
-# 2. Build just that model
-dbt run --select vizio_daily_fact_content_summary
-
-# 3. Test the model
-dbt test --select vizio_daily_fact_content_summary
-
-# 4. Build and test together
-dbt build --select vizio_daily_fact_content_summary
-```
-
-### Before Committing
-
-```bash
-# Quick validation
-dbt test --select test_name:*has_data
-
-# Full test suite
-dbt test
-
-# Generate documentation
-dbt docs generate
-```
-
 ## Resources
 
 ### dbt Resources
@@ -191,5 +106,4 @@ dbt docs generate
 
 ### Project Resources
 - [VIZIO_MODELS_README.md](VIZIO_MODELS_README.md) - Detailed model documentation
-- [TESTING_GUIDE.md](TESTING_GUIDE.md) - Testing framework guide
 - [Databricks SQL Reference](https://docs.databricks.com/sql/language-manual/index.html)
