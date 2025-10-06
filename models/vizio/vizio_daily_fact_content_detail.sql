@@ -38,7 +38,7 @@ raw_content AS (
 ),
 enriched_content AS (
     SELECT 
-        *,
+        rc.*,
         tz.timezone AS TIMEZONE
     FROM raw_content rc
     LEFT JOIN timezone_mapping tz
