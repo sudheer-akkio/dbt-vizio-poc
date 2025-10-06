@@ -24,12 +24,19 @@ sources:
       - name: nothing_bundt_cakes_pop_data_akkio_poc
         description: TV population data by market for Nothing Bundt Cakes campaign
 
+  - name: akkio_common
+    database: akkio
+    schema: akkio_common
+    tables:
+      - name: mac_vizio_synethic
+        description: Experian demographic and household attributes for TV devices
+
 models:       
   - name: vizio_daily_fact_content_summary
     description: >
       Content consumption activity aggregated per given day.
       TRY to use this table instead of VIZIO_DAILY_FACT_CONTENT_DETAIL, unless this table does not contain enough detail for the query.
-      | :short-name:content_consumption: |<
+      | :short-name:content_consumption: :use_for_audience_gen: |<
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
@@ -102,7 +109,7 @@ models:
       Detail Content consumption activity. This contains the same data as VIZIO_DAILY_FACT_CONTENT_SUMMARY table with ARRAY columns exploded into separate rows.
       ONLY use this table when VIZIO_DAILY_FACT_CONTENT_SUMMARY contains insufficient detail to answer the query.
       This provides granular detail about each content viewing session.
-      | :short-name:content_consumption_detail: |<
+      | :short-name:content_consumption_detail: :use_for_audience_gen: |<
     columns:
       - name: PARTITION_DATE
         description: partition_date | :akkio-context-ignore |
@@ -167,7 +174,7 @@ models:
     description: >
       Advertisement (commercial) viewed activity aggregated per given day.
       TRY to use this table instead of VIZIO_DAILY_FACT_COMMERICAL_DETAIL, unless this table does not contain enough detail for the query.
-      | :short-name:commercial_ad_views: |<
+      | :short-name:commercial_ad_views: :use_for_audience_gen: |<
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
@@ -252,7 +259,7 @@ models:
       Detail info on Advertisements (commercials) viewed on TV. This contains the same data as VIZIO_DAILY_FACT_COMMERCIAL_SUMMARY table with ARRAY columns exploded into separate rows.
       ONLY use this table when VIZIO_DAILY_FACT_COMMERCIAL_SUMMARY contains insufficient detail to answer the query.
       This provides granular detail about each commercial view including surrounding content context.
-      | :short-name:commercial_ad_views_detail: |<
+      | :short-name:commercial_ad_views_detail: :use_for_audience_gen: |<
     columns:
       - name: PARTITION_DATE
         description: partition_date | :akkio-context-ignore |
@@ -333,7 +340,7 @@ models:
     description: >
       Standard device activity and location data aggregated per given day.
       TRY to use this table instead of VIZIO_DAILY_FACT_STANDARD_DETAIL, unless this table does not contain enough detail for the query.
-      | :short-name:device_activity: |<
+      | :short-name:device_activity: :use_for_audience_gen: |<
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
@@ -392,7 +399,7 @@ models:
       Detail device activity and location data. This contains the same data as VIZIO_DAILY_FACT_STANDARD_SUMMARY table with ARRAY columns exploded into separate rows.
       ONLY use this table when VIZIO_DAILY_FACT_STANDARD_SUMMARY contains insufficient detail to answer the query.
       This provides granular detail about each device activity session.
-      | :short-name:device_activity_detail: |<
+      | :short-name:device_activity_detail: :use_for_audience_gen: |<
     columns:
       - name: PARTITION_DATE
         description: partition_date | :akkio-context-ignore |
@@ -437,7 +444,7 @@ models:
     description: >
       Campaign attribution data for Nothing Bundt Cakes campaign showing TV impressions and market reach.
       Use this table to analyze campaign reach, market penetration, and content context for ad impressions.
-      | :short-name:campaign_attribution: |<
+      | :short-name:campaign_attribution: :use_for_audience_gen: |<
     columns:
       - name: PARTITION_DATE
         description: partition_date | :akkio-context-ignore |
@@ -486,10 +493,76 @@ models:
 
   - name: vizio_attributes_latest
     description: >
-      Latest Location and device attributes for TV_ID. This table will be populated when additional data source becomes available.
-      | :short-name:device_attributes: |<
+      Latest demographic and household attributes from Experian for each TV device.
+      This table provides decoded (non-one-hot-encoded) demographic, socioeconomic, and household composition data
+      for audience segmentation, targeting, and analytics use cases. Each TV_ID has only the most recent attribute match.
+      | :short-name:audience_attributes: :use_for_audience_gen: |<
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - TVID
     columns:
-      - name: TV_ID
-        description: Device ID hash for the TV Device
+      - name: PARTITION_DATE
+        description: partition_date derived from match_date | :akkio-context-ignore |<
         data_tests:
           - not_null
+      - name: TVID
+        description: Device ID hash for the TV Device (joins to TV_ID in other tables)
+        data_tests:
+          - not_null
+          - unique
+      - name: MATCH_DATE
+        description: Timestamp when the demographic data was matched to the device
+        data_tests:
+          - not_null
+      - name: GENDER
+        description: Gender of primary viewer (Male/Female)
+      - name: AGE
+        description: Age of primary viewer (median of age range bucket)
+        data_tests:
+          - dbt_utils.accepted_range:
+              min_value: 18
+              max_value: 100
+              severity: warn
+      - name: AGE_BUCKET
+        description: Age range bucket label (18-24, 25-34, 35-44, 45-54, 55-64, 65+)
+      - name: EDUCATION_LEVEL
+        description: Highest education level attained (Graduate, College, Some College, High School)
+      - name: ETHNICITY
+        description: Ethnicity classification (African American, Asian, White Non-Hispanic, Hispanic, Middle Eastern, Native American, Other, Unknown)
+      - name: SPANISH_LANGUAGE
+        description: Spanish language preference indicator (Y/N)
+      - name: MARITAL_STATUS
+        description: Marital status (Married, Single)
+      - name: HOME_OWNERSHIP
+        description: Home ownership status (Owner, Renter)
+      - name: HOUSEHOLD_INCOME_K
+        description: Household income in thousands (median of income range bucket)
+        data_tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 500
+              severity: warn
+      - name: INCOME_BRACKET
+        description: Household income range label ($0-35K through $200K+)
+      - name: HAS_BABIES_0_3
+        description: Presence of babies aged 0-3 in household (Y/N)
+      - name: HAS_CHILDREN_0_18
+        description: Presence of children aged 0-18 in household (Y/N)
+      - name: ADULT_HOUSEHOLD_SIZE
+        description: Number of adults in household
+        data_tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 20
+              severity: warn
+      - name: MOVE_LIKELY
+        description: Likelihood of household moving soon (Y/N)
+      - name: MOVE_RECENT
+        description: Recent move indicator (Y/N)
+      - name: LOW_QUALITY_FLAG
+        description: Data quality flag indicating low quality match (Y/N)
+      - name: DEMO_INCOMPLETE_FLAG
+        description: Demographic data incomplete indicator (Y/N)
+      - name: DBT_UPDATED_AT
+        description: Timestamp when record was processed by dbt
