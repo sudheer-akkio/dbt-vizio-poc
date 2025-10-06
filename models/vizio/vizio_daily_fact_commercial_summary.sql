@@ -1,0 +1,45 @@
+{{ config(
+    materialized='table',
+    unique_key = ['PARTITION_DATE', 'TV_ID'],
+    post_hook=[
+        "alter table {{this}} cluster by (partition_date, tv_id)"
+    ]
+)}}
+
+WITH 
+detail AS (SELECT * FROM {{ ref('vizio_daily_fact_commerical_detail') }} )
+SELECT
+    PARTITION_DATE,
+    PARTITION_DATE AS VIEWED_DATE,
+    TV_ID,
+    MAX(TIMEZONE) AS TIMEZONE,
+    collect_set(ZIP_CODE) AS ZIP_CODE_ARRAY,
+    collect_set(DMA) AS DMA_ARRAY,
+    collect_set(CREATIVE_ID) AS CREATIVE_ID_ARRAY,
+    collect_set(BRAND_NAME) AS BRAND_NAME_ARRAY,
+    collect_set(AD_TITLE) AS AD_TITLE_ARRAY,
+    collect_set(COMMERCIAL_CATEGORY) AS COMMERCIAL_CATEGORY_ARRAY,
+    collect_set(PREV_TITLE) AS PREV_CONTENT_TITLE_ARRAY,
+    collect_set(PREV_CALLSIGN) AS PREV_CONTENT_CALLSIGN_ARRAY,
+    collect_set(PREV_NETWORK) AS PREV_CONTENT_NETWORK_ARRAY,
+    collect_set(NEXT_TITLE) AS NEXT_CONTENT_TITLE_ARRAY,
+    collect_set(NEXT_CALLSIGN) AS NEXT_CONTENT_CALLSIGN_ARRAY,
+    collect_set(NEXT_NETWORK) AS NEXT_CONTENT_NETWORK_ARRAY,
+    collect_set(INPUT_CATEGORY) AS INPUT_CATEGORY_ARRAY,
+    collect_set(INPUT_DEVICE_NAME) AS INPUT_DEVICE_ARRAY,
+    collect_set(APP_SERVICE) AS APP_SERVICE_ARRAY,
+    string_agg(DISTINCT BRAND_NAME, '|') AS BRAND_NAME_STR_LIST,
+    string_agg(DISTINCT AD_TITLE, '|') AS AD_TITLE_STR_LIST,
+    string_agg(DISTINCT COMMERCIAL_CATEGORY, '|') AS COMMERCIAL_CATEGORY_STR_LIST,
+    string_agg(DISTINCT PREV_TITLE, '|') AS PREV_CONTENT_TITLE_STR_LIST,
+    string_agg(DISTINCT NEXT_TITLE, '|') AS NEXT_CONTENT_TITLE_STR_LIST,
+    string_agg(DISTINCT INPUT_CATEGORY, '|') AS INPUT_CATEGORY_STR_LIST,
+    string_agg(DISTINCT INPUT_DEVICE_NAME, '|') AS INPUT_DEVICE_STR_LIST,
+    string_agg(DISTINCT APP_SERVICE, '|') AS APP_SERVICE_STR_LIST,
+    COUNT(*) AS TOTAL_AD_VIEWS,
+    SUM(AD_LENGTH) AS TOTAL_AD_SECONDS
+FROM
+    detail
+GROUP BY
+    PARTITION_DATE, TV_ID
+

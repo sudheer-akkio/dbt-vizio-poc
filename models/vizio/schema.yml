@@ -1,0 +1,495 @@
+version: 2
+
+sources:
+  - name: vizio_poc_share
+    database: vizio-poc-share
+    schema: akkio
+    tables:
+      - name: production_r2079_content_with_null
+        description: Raw content viewing data from Vizio devices
+      - name: production_r2080_commercialfeedmodular
+        description: Raw commercial/advertisement viewing data from Vizio devices
+      - name: production_r2081_ipage
+        description: Raw device activity and location data from Vizio devices
+      - name: production_r2067_optout
+        description: Device opt-out status tracking
+      - name: mk_akkio_genre_title_mapping
+        description: Mapping table for episode IDs to titles and genres
+      - name: mk_akkio_tvtimezone_mapping
+        description: Mapping table for device hashes to timezones
+      - name: mk_commercialcategory_mapping
+        description: Mapping table for commercial creative values to categories
+      - name: nothing_bundt_cakes_attr_data_akkio_poc
+        description: Attribution data for Nothing Bundt Cakes campaign
+      - name: nothing_bundt_cakes_pop_data_akkio_poc
+        description: TV population data by market for Nothing Bundt Cakes campaign
+
+models:       
+  - name: vizio_daily_fact_content_summary
+    description: >
+      Content consumption activity aggregated per given day.
+      TRY to use this table instead of VIZIO_DAILY_FACT_CONTENT_DETAIL, unless this table does not contain enough detail for the query.
+      | :short-name:content_consumption: |<
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - PARTITION_DATE
+            - TV_ID
+    columns:
+      - name: PARTITION_DATE
+        description: partition_date | :akkio-context-ignore |
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('vizio_daily_fact_content_detail')
+              field: PARTITION_DATE
+              severity: warn
+      - name: VIEWED_DATE
+        description: date content was viewed
+        data_tests:
+          - not_null
+      - name: TV_ID
+        description: Device ID hash for the TV Device
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('vizio_daily_fact_content_detail')
+              field: TV_ID
+              severity: warn
+      - name: TIMEZONE
+        description: Timezone of the TV device for local time conversion
+      - name: ZIP_CODE_ARRAY
+        description: List of possible Zip Code locations of Household where TV was used
+      - name: DMA_ARRAY
+        description: List of Designated Market Area codes where TV was used
+      - name: NETWORK_ARRAY
+        description: List of Networks viewed | :lower :space-to-hyphen :str-list-col-pregen
+      - name: CALLSIGN_ARRAY
+        description: List of Networks callsigns viewed | :lower :space-to-hyphen :str-list-col-pregen
+      - name: TITLE_ARRAY
+        description: List of Content titles watched | :lower :space-to-hyphen :str-list-col-pregen
+      - name: GENRE_ARRAY
+        description: List of content Genre watched | :lower :space-to-hyphen :str-list-col-pregen
+      - name: INPUT_CATEGORY_ARRAY
+        description: List of input device categories used to watch content | :lower :space-to-hyphen :str-list-col-pregen
+      - name: INPUT_DEVICE_ARRAY
+        description: List of input devices used to watch content | :lower :space-to-hyphen :str-list-col-pregen
+      - name: APP_SERVICE_ARRAY
+        description: List of app services used to watch content | :lower :space-to-hyphen :str-list-col-pregen
+      - name: NETWORK_STR_LIST
+        description: List of Networks viewed | :lower :space-to-hyphen :akkio-context-ignore
+      - name: CALLSIGN_STR_LIST
+        description: List of Networks callsigns viewed | :lower :space-to-hyphen :akkio-context-ignore
+      - name: TITLE_STR_LIST
+        description: List of Content titles watched | :lower :space-to-hyphen :akkio-context-ignore
+      - name: GENRE_STR_LIST
+        description: List of content Genre watched | :lower :space-to-hyphen :akkio-context-ignore
+      - name: INPUT_CATEGORY_STR_LIST
+        description: List of input device categories used | :lower :space-to-hyphen :akkio-context-ignore
+      - name: INPUT_DEVICE_STR_LIST
+        description: List of input devices used to watch content | :lower :space-to-hyphen :akkio-context-ignore
+      - name: APP_SERVICE_STR_LIST
+        description: List of app services used to watch content | :lower :space-to-hyphen :akkio-context-ignore
+      - name: TOTAL_VIEWING_SECONDS
+        description: Total seconds of content viewed during the day
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+  - name: vizio_daily_fact_content_detail
+    description: >
+      Detail Content consumption activity. This contains the same data as VIZIO_DAILY_FACT_CONTENT_SUMMARY table with ARRAY columns exploded into separate rows.
+      ONLY use this table when VIZIO_DAILY_FACT_CONTENT_SUMMARY contains insufficient detail to answer the query.
+      This provides granular detail about each content viewing session.
+      | :short-name:content_consumption_detail: |<
+    columns:
+      - name: PARTITION_DATE
+        description: partition_date | :akkio-context-ignore |
+        data_tests:
+          - not_null
+      - name: VIEWED_DATE
+        description: date content was viewed
+        data_tests:
+          - not_null
+      - name: TV_ID
+        description: Device ID hash for the TV Device
+        data_tests:
+          - not_null
+      - name: HASHED_IP
+        description: sha1 hash of IPv4 Address postfixed with salt
+      - name: ZIP_CODE
+        description: Zip Code of Household where TV was last used
+      - name: DMA
+        description: Designated Market Area code of the viewing location
+      - name: TIMEZONE
+        description: Timezone of the TV device for local time conversion
+      - name: NETWORK
+        description: Name of the network affiliate | :lower :space-to-hyphen
+      - name: CALLSIGN
+        description: Call sign of the network affiliate | :lower :space-to-hyphen
+      - name: PROGRAM_EPISODE_ID
+        description: Episode ID of show episode or movie
+      - name: TITLE
+        description: Title of the show or movie name | :lower :space-to-hyphen
+      - name: GENRE
+        description: Semicolon separated list of Genres of the show/movie | :lower :space-to-hyphen
+      - name: AIR_DATE
+        description: Original air date of the content
+      - name: SESSION_TYPE
+        description: Live or DVR viewing session indicator
+        data_tests:
+          - accepted_values:
+              values: ['Live', 'DVR', 'live', 'dvr']
+              severity: warn
+      - name: SESSION_START_TIME_UTC
+        description: Actual start time in UTC when device started watching this content
+        data_tests:
+          - not_null
+      - name: SESSION_END_TIME_UTC
+        description: Actual end time in UTC when device stopped watching this content
+        data_tests:
+          - not_null
+      - name: TOTAL_SECONDS
+        description: total seconds this content was watched
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: INPUT_CATEGORY
+        description: Category of the input device generating the data | :lower :space-to-hyphen
+      - name: INPUT_DEVICE_NAME
+        description: Name of the input device generating the data | :lower :space-to-hyphen
+      - name: APP_SERVICE
+        description: Application or service used for content viewing | :lower :space-to-hyphen
+
+  - name: vizio_daily_fact_commercial_summary
+    description: >
+      Advertisement (commercial) viewed activity aggregated per given day.
+      TRY to use this table instead of VIZIO_DAILY_FACT_COMMERICAL_DETAIL, unless this table does not contain enough detail for the query.
+      | :short-name:commercial_ad_views: |<
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - PARTITION_DATE
+            - TV_ID
+    columns:
+      - name: PARTITION_DATE
+        description: partition_date | :akkio-context-ignore |
+        data_tests:
+          - not_null
+      - name: VIEWED_DATE
+        description: date commercial was viewed
+        data_tests:
+          - not_null
+      - name: TV_ID
+        description: Device ID hash for the TV Device
+        data_tests:
+          - not_null
+      - name: TIMEZONE
+        description: Timezone of the TV device for local time conversion
+      - name: ZIP_CODE_ARRAY
+        description: List of possible Zip Code locations of Household where TV was used
+      - name: DMA_ARRAY
+        description: List of Designated Market Area codes where TV was used
+      - name: CREATIVE_ID_ARRAY
+        description: List of Unique Identifiers for the creative of Ads viewed
+      - name: BRAND_NAME_ARRAY
+        description: List of brands of ads viewed | :lower :space-to-hyphen :str-list-col-pregen
+      - name: AD_TITLE_ARRAY
+        description: List of commercial ad titles viewed | :lower :space-to-hyphen :str-list-col-pregen
+      - name: COMMERCIAL_CATEGORY_ARRAY
+        description: List of commercial categories viewed | :lower :space-to-hyphen :str-list-col-pregen
+      - name: PREV_CONTENT_TITLE_ARRAY
+        description: List of content titles watched before the commercial | :lower :space-to-hyphen :str-list-col-pregen
+      - name: PREV_CONTENT_CALLSIGN_ARRAY
+        description: List of callsigns for content before the commercial | :lower :space-to-hyphen :str-list-col-pregen
+      - name: PREV_CONTENT_NETWORK_ARRAY
+        description: List of networks for content before the commercial | :lower :space-to-hyphen :str-list-col-pregen
+      - name: NEXT_CONTENT_TITLE_ARRAY
+        description: List of content titles watched after the commercial | :lower :space-to-hyphen :str-list-col-pregen
+      - name: NEXT_CONTENT_CALLSIGN_ARRAY
+        description: List of callsigns for content after the commercial | :lower :space-to-hyphen :str-list-col-pregen
+      - name: NEXT_CONTENT_NETWORK_ARRAY
+        description: List of networks for content after the commercial | :lower :space-to-hyphen :str-list-col-pregen
+      - name: INPUT_CATEGORY_ARRAY
+        description: List of input device categories used | :lower :space-to-hyphen :str-list-col-pregen
+      - name: INPUT_DEVICE_ARRAY
+        description: List of input devices used to watch content | :lower :space-to-hyphen :str-list-col-pregen
+      - name: APP_SERVICE_ARRAY
+        description: List of app services used | :lower :space-to-hyphen :str-list-col-pregen
+      - name: BRAND_NAME_STR_LIST
+        description: List of brands of ads viewed | :lower :space-to-hyphen :akkio-context-ignore
+      - name: AD_TITLE_STR_LIST
+        description: List of commercial ad titles viewed | :lower :space-to-hyphen :akkio-context-ignore
+      - name: COMMERCIAL_CATEGORY_STR_LIST
+        description: List of commercial categories viewed | :lower :space-to-hyphen :akkio-context-ignore
+      - name: PREV_CONTENT_TITLE_STR_LIST
+        description: List of content titles watched before commercials | :lower :space-to-hyphen :akkio-context-ignore
+      - name: NEXT_CONTENT_TITLE_STR_LIST
+        description: List of content titles watched after commercials | :lower :space-to-hyphen :akkio-context-ignore
+      - name: INPUT_CATEGORY_STR_LIST
+        description: List of input device categories used | :lower :space-to-hyphen :akkio-context-ignore
+      - name: INPUT_DEVICE_STR_LIST
+        description: List of input devices used | :lower :space-to-hyphen :akkio-context-ignore
+      - name: APP_SERVICE_STR_LIST
+        description: List of app services used | :lower :space-to-hyphen :akkio-context-ignore
+      - name: TOTAL_AD_VIEWS
+        description: Total number of commercial views for the day
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: TOTAL_AD_SECONDS
+        description: Total seconds of commercials viewed during the day
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+
+  - name: vizio_daily_fact_commerical_detail
+    description: >
+      Detail info on Advertisements (commercials) viewed on TV. This contains the same data as VIZIO_DAILY_FACT_COMMERCIAL_SUMMARY table with ARRAY columns exploded into separate rows.
+      ONLY use this table when VIZIO_DAILY_FACT_COMMERCIAL_SUMMARY contains insufficient detail to answer the query.
+      This provides granular detail about each commercial view including surrounding content context.
+      | :short-name:commercial_ad_views_detail: |<
+    columns:
+      - name: PARTITION_DATE
+        description: partition_date | :akkio-context-ignore |
+        data_tests:
+          - not_null
+      - name: VIEWED_DATE
+        description: date commercial was viewed
+        data_tests:
+          - not_null
+      - name: TV_ID
+        description: Device ID hash for the TV Device
+        data_tests:
+          - not_null
+      - name: HASHED_IP
+        description: sha1 hash of IPv4 Address postfixed with salt
+      - name: ZIP_CODE
+        description: Zip Code of Household where TV was last used
+      - name: DMA
+        description: Designated Market Area code of the viewing location
+      - name: TIMEZONE
+        description: Timezone of the TV device for local time conversion
+      - name: CREATIVE_ID
+        description: Unique Identifier for the creative
+      - name: AD_MATCH_START_TIME_UTC
+        description: Actual start time in utc when device started watching the ad
+        data_tests:
+          - not_null
+      - name: AD_MATCH_END_TIME_UTC
+        description: Actual end time in utc when device stopped watching the ad
+        data_tests:
+          - not_null
+      - name: AD_LENGTH
+        description: Length of the creative in seconds
+        data_tests:
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+              severity: warn
+      - name: BRAND_NAME
+        description: Name of the brand of the ad | :lower :space-to-hyphen
+      - name: AD_TITLE
+        description: Title of the commercial ad | :lower :space-to-hyphen
+      - name: COMMERCIAL_CATEGORY
+        description: Category classification of the commercial | :lower :space-to-hyphen
+      - name: PREV_EPISODE_ID
+        description: Episode ID of content watched before the commercial
+      - name: PREV_TITLE
+        description: Title of content watched before the commercial | :lower :space-to-hyphen
+      - name: PREV_CONTENT_START_TIME_UTC
+        description: Start time of previous content in UTC
+      - name: PREV_CONTENT_END_TIME_UTC
+        description: End time of previous content in UTC
+      - name: PREV_CALLSIGN
+        description: Callsign of network for previous content | :lower :space-to-hyphen
+      - name: PREV_NETWORK
+        description: Network affiliate for previous content | :lower :space-to-hyphen
+      - name: NEXT_EPISODE_ID
+        description: Episode ID of content watched after the commercial
+      - name: NEXT_TITLE
+        description: Title of content watched after the commercial | :lower :space-to-hyphen
+      - name: NEXT_CONTENT_START_TIME_UTC
+        description: Start time of next content in UTC
+      - name: NEXT_CONTENT_END_TIME_UTC
+        description: End time of next content in UTC
+      - name: NEXT_CALLSIGN
+        description: Callsign of network for next content | :lower :space-to-hyphen
+      - name: NEXT_NETWORK
+        description: Network affiliate for next content | :lower :space-to-hyphen
+      - name: SESSION_TYPE
+        description: Live or DVR viewing session indicator
+      - name: INPUT_CATEGORY
+        description: Category of the input device generating the data | :lower :space-to-hyphen
+      - name: INPUT_DEVICE_NAME
+        description: Name of the input device generating the data | :lower :space-to-hyphen
+      - name: APP_SERVICE
+        description: Application or service used | :lower :space-to-hyphen
+
+  - name: vizio_daily_fact_standard_summary
+    description: >
+      Standard device activity and location data aggregated per given day.
+      TRY to use this table instead of VIZIO_DAILY_FACT_STANDARD_DETAIL, unless this table does not contain enough detail for the query.
+      | :short-name:device_activity: |<
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - PARTITION_DATE
+            - TV_ID
+    columns:
+      - name: PARTITION_DATE
+        description: partition_date | :akkio-context-ignore |
+        data_tests:
+          - not_null
+      - name: ACTIVITY_DATE
+        description: date of device activity
+        data_tests:
+          - not_null
+      - name: TV_ID
+        description: Device ID hash for the TV Device
+        data_tests:
+          - not_null
+      - name: TIMEZONE
+        description: Timezone of the TV device for local time conversion
+      - name: ZIP_CODE_ARRAY
+        description: List of Zip Codes where TV was active
+      - name: DMA_ARRAY
+        description: List of Designated Market Area codes where TV was active
+      - name: CITY_ARRAY
+        description: List of cities where TV was active
+      - name: STATE_CODE_ARRAY
+        description: List of state codes where TV was active
+      - name: ZIP_CODE_STR_LIST
+        description: List of Zip Codes where TV was active | :akkio-context-ignore
+      - name: DMA_STR_LIST
+        description: List of Designated Market Area codes where TV was active | :akkio-context-ignore
+      - name: CITY_STR_LIST
+        description: List of cities where TV was active | :akkio-context-ignore
+      - name: STATE_CODE_STR_LIST
+        description: List of state codes where TV was active | :akkio-context-ignore
+      - name: FIRST_ACTIVITY_TIME
+        description: Timestamp of first activity session for the day
+      - name: LAST_ACTIVITY_TIME
+        description: Timestamp of last activity session for the day
+      - name: TOTAL_ACTIVITY_SECONDS
+        description: Total seconds of device activity during the day
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: TOTAL_SESSIONS
+        description: Total number of activity sessions for the day
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+
+  - name: vizio_daily_fact_standard_detail
+    description: >
+      Detail device activity and location data. This contains the same data as VIZIO_DAILY_FACT_STANDARD_SUMMARY table with ARRAY columns exploded into separate rows.
+      ONLY use this table when VIZIO_DAILY_FACT_STANDARD_SUMMARY contains insufficient detail to answer the query.
+      This provides granular detail about each device activity session.
+      | :short-name:device_activity_detail: |<
+    columns:
+      - name: PARTITION_DATE
+        description: partition_date | :akkio-context-ignore |
+        data_tests:
+          - not_null
+      - name: ACTIVITY_DATE
+        description: date of device activity
+        data_tests:
+          - not_null
+      - name: TV_ID
+        description: Device ID hash for the TV Device
+        data_tests:
+          - not_null
+      - name: HASHED_IP
+        description: sha1 hash of IPv4 Address postfixed with salt
+      - name: TIMEZONE
+        description: Timezone of the TV device for local time conversion
+      - name: SESSION_START_TIME_UTC
+        description: Start time of activity session in UTC
+        data_tests:
+          - not_null
+      - name: SESSION_END_TIME_UTC
+        description: End time of activity session in UTC
+        data_tests:
+          - not_null
+      - name: TOTAL_SECONDS
+        description: Total seconds of this activity session
+        data_tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: CITY
+        description: City where TV was active
+      - name: STATE_CODE
+        description: State code where TV was active (ISO format)
+      - name: DMA
+        description: Designated Market Area code of the device location
+      - name: ZIP_CODE
+        description: Zip Code of the device location
+
+  - name: vizio_campaign_attribution
+    description: >
+      Campaign attribution data for Nothing Bundt Cakes campaign showing TV impressions and market reach.
+      Use this table to analyze campaign reach, market penetration, and content context for ad impressions.
+      | :short-name:campaign_attribution: |<
+    columns:
+      - name: PARTITION_DATE
+        description: partition_date | :akkio-context-ignore |
+        data_tests:
+          - not_null
+      - name: IMPRESSION_DATE
+        description: date of the ad impression
+        data_tests:
+          - not_null
+      - name: TV_ID
+        description: Device ID hash for the TV Device
+        data_tests:
+          - not_null
+      - name: HASHED_IP
+        description: sha1 hash of IPv4 Address postfixed with salt
+      - name: IMPRESSION_TIMESTAMP
+        description: Exact timestamp of ad impression in UTC
+        data_tests:
+          - not_null
+      - name: TIMEZONE
+        description: Timezone of the TV device for local time conversion
+      - name: ZIP_CODE
+        description: Zip Code of Household where impression occurred
+      - name: MARKET
+        description: Market name where impression occurred
+        data_tests:
+          - not_null
+      - name: MARKET_TV_POPULATION
+        description: Total Inscape TV population in the market for reach calculations
+        data_tests:
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+              severity: warn
+      - name: SHOW_TITLE
+        description: Title of show during which impression occurred | :lower :space-to-hyphen
+      - name: STATION_CALL_SIGN
+        description: Call sign of station where impression occurred | :lower :space-to-hyphen
+      - name: CHANNEL_AFFILIATE
+        description: Network affiliate where impression occurred | :lower :space-to-hyphen
+      - name: LOCAL_OR_NATIONAL
+        description: Indicates if impression was on local or national broadcast
+      - name: SESSION_TYPE
+        description: Type of viewing session (Live, DVR, etc.)
+      - name: SESSION_SOURCE
+        description: Source of the viewing session data
+
+  - name: vizio_attributes_latest
+    description: >
+      Latest Location and device attributes for TV_ID. This table will be populated when additional data source becomes available.
+      | :short-name:device_attributes: |<
+    columns:
+      - name: TV_ID
+        description: Device ID hash for the TV Device
+        data_tests:
+          - not_null
