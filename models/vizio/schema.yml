@@ -23,6 +23,10 @@ sources:
         description: Attribution data for Nothing Bundt Cakes campaign
       - name: nothing_bundt_cakes_pop_data_akkio_poc
         description: TV population data by market for Nothing Bundt Cakes campaign
+      - name: farm_bureau_financial_services_attr_data_akkio_poc
+        description: Attribution data for Farm Bureau Financial Services campaign
+      - name: farm_bureau_financial_services_pop_data_akkio_poc
+        description: TV population data by market for Farm Bureau Financial Services campaign
 
   - name: akkio_common
     database: akkio
@@ -465,7 +469,7 @@ models:
       - name: ZIP_CODE
         description: Zip Code of the device location
 
-  - name: vizio_campaign_attribution
+  - name: vizio_campaign_nothing_bundt_cakes
     description: >
       Campaign attribution data for Nothing Bundt Cakes campaign showing TV impressions and market reach.
       Use this table to analyze campaign reach, market penetration, and content context for ad impressions.
@@ -504,6 +508,68 @@ models:
           - not_null
       - name: MARKET_TV_POPULATION
         description: Total Inscape TV population in the market for reach calculations
+        data_tests:
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+              severity: warn
+      - name: SHOW_TITLE
+        description: Title of show during which impression occurred | :lower :space-to-hyphen
+      - name: STATION_CALL_SIGN
+        description: Call sign of station where impression occurred | :lower :space-to-hyphen
+      - name: CHANNEL_AFFILIATE
+        description: Network affiliate where impression occurred | :lower :space-to-hyphen
+      - name: LOCAL_OR_NATIONAL
+        description: Indicates if impression was on local or national broadcast
+      - name: SESSION_TYPE
+        description: Type of viewing session (Live, DVR, etc.)
+      - name: SESSION_SOURCE
+        description: Source of the viewing session data
+  
+  - name: vizio_campaign_farm_bureau_financial_services
+    description: >
+      Campaign attribution data for Farm Bureau Financial Services campaign showing TV impressions and market reach.
+      Use this table to analyze campaign reach, market penetration, and content context for ad impressions.
+      | :short-name:campaign_attribution: :use_for_audience_gen: |<
+    columns:
+      - name: PARTITION_DATE
+        description: partition_date | :akkio-context-ignore |
+        data_tests:
+          - not_null
+      - name: IMPRESSION_DATE
+        description: date of the ad impression
+        data_tests:
+          - not_null
+      - name: TV_ID
+        description: Device ID hash for the TV Device
+        data_tests:
+          - not_null
+      - name: AKKIO_ID
+        description: Primary device identifier from Akkio (optimized - same value as TV_ID)
+        data_tests:
+          - not_null
+          - unique
+      - name: HASHED_IP
+        description: sha1 hash of IPv4 Address postfixed with salt
+      - name: IMPRESSION_TIMESTAMP
+        description: Exact timestamp of ad impression in UTC
+        data_tests:
+          - not_null
+      - name: TIMEZONE
+        description: Timezone of the TV device for local time conversion
+      - name: ZIP_CODE
+        description: Zip Code of Household where impression occurred
+      - name: MARKET
+        description: Market name where impression occurred
+        data_tests:
+          - not_null
+      - name: MARKET_TV_POPULATION
+        description: Total Inscape TV population in the market for reach calculations
+        data_tests:
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+              severity: warn
+      - name: MARKET_UE_POPULATION
+        description: Total UE population in the market for reach calculations
         data_tests:
           - dbt_utils.expression_is_true:
               expression: "> 0"

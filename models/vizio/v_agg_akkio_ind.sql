@@ -43,16 +43,6 @@ standard_ips AS (
     FROM {{ ref('vizio_daily_fact_standard_detail') }}
     WHERE HASHED_IP IS NOT NULL
 ),
-
--- Collect all unique IPs from campaign attribution
-campaign_ips AS (
-    SELECT 
-        AKKIO_ID,
-        HASHED_IP
-    FROM {{ ref('vizio_campaign_attribution') }}
-    WHERE HASHED_IP IS NOT NULL
-),
-
 -- Union all IP sources and aggregate by AKKIO_ID
 aggregated_ips AS (
     SELECT 
@@ -63,10 +53,7 @@ aggregated_ips AS (
         UNION ALL
         SELECT AKKIO_ID, HASHED_IP FROM commercial_ips
         UNION ALL
-        SELECT AKKIO_ID, HASHED_IP FROM standard_ips
-        UNION ALL
-        SELECT AKKIO_ID, HASHED_IP FROM campaign_ips
-    )
+        SELECT AKKIO_ID, HASHED_IP FROM standard_ips    )
     GROUP BY AKKIO_ID
 )
 
