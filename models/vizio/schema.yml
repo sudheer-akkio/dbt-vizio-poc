@@ -28,7 +28,7 @@ sources:
     database: akkio
     schema: akkio_common
     tables:
-      - name: mac_vizio_synethic
+      - name: mac_vizio_synthetic
         description: Experian demographic and household attributes for TV devices
 
 models:       
@@ -254,7 +254,7 @@ models:
           - dbt_utils.expression_is_true:
               expression: ">= 0"
 
-  - name: vizio_daily_fact_commerical_detail
+  - name: vizio_daily_fact_commercial_detail
     description: >
       Detail info on Advertisements (commercials) viewed on TV. This contains the same data as VIZIO_DAILY_FACT_COMMERCIAL_SUMMARY table with ARRAY columns exploded into separate rows.
       ONLY use this table when VIZIO_DAILY_FACT_COMMERCIAL_SUMMARY contains insufficient detail to answer the query.

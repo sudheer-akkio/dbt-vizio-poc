@@ -57,7 +57,7 @@ dbt-vizio-poc/
 │   ├── vizio_daily_fact_content_summary.sql
 │   ├── vizio_daily_fact_content_detail.sql
 │   ├── vizio_daily_fact_commercial_summary.sql
-│   ├── vizio_daily_fact_commerical_detail.sql
+│   ├── vizio_daily_fact_commercial_detail.sql
 │   ├── vizio_daily_fact_standard_summary.sql
 │   ├── vizio_daily_fact_standard_detail.sql
 │   ├── vizio_campaign_attribution.sql
@@ -79,7 +79,7 @@ dbt-vizio-poc/
 
 2. **Commercial/Advertisement**
    - `vizio_daily_fact_commercial_summary` - Aggregated daily ad views
-   - `vizio_daily_fact_commerical_detail` - Granular ad viewing sessions
+   - `vizio_daily_fact_commercial_detail` - Granular ad viewing sessions
 
 3. **Device Activity**
    - `vizio_daily_fact_standard_summary` - Aggregated daily device activity

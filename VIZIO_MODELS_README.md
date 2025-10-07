@@ -22,7 +22,7 @@ This implementation creates a comprehensive data modeling layer for Vizio TV vie
 ### 2. Commercial/Advertisement Models
 **Source:** `production_r2080_commercialfeedmodular`
 
-- **vizio_daily_fact_commerical_detail.sql**: Individual commercial views with surrounding content context
+- **vizio_daily_fact_commercial_detail.sql**: Individual commercial views with surrounding content context
 - **vizio_daily_fact_commercial_summary.sql**: Daily aggregation with commercial metrics
 
 **Key Features:**

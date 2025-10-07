@@ -25,13 +25,13 @@
 */
 
 WITH source_attributes AS (
-    SELECT * FROM {{ source('akkio_common', 'mac_vizio_synethic') }}
+    SELECT * FROM {{ source('akkio_common', 'mac_vizio_synthetic') }}
 ),
 
 attributes_decoded AS (
     SELECT
         -- Primary Key
-        tvid AS TVID,
+        AKKIO_ID AS TVID,
         
         -- Temporal
         match_date AS MATCH_DATE,
@@ -158,7 +158,7 @@ attributes_decoded AS (
         CURRENT_TIMESTAMP() AS DBT_UPDATED_AT
         
     FROM source_attributes
-    WHERE tvid IS NOT NULL
+    WHERE AKKIO_ID IS NOT NULL
 ),
 
 -- Get only the most recent match for each TV ID

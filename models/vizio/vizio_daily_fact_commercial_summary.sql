@@ -7,7 +7,7 @@
 )}}
 
 WITH 
-detail AS (SELECT * FROM {{ ref('vizio_daily_fact_commerical_detail') }} )
+detail AS (SELECT * FROM {{ ref('vizio_daily_fact_commercial_detail') }} )
 SELECT
     PARTITION_DATE,
     PARTITION_DATE AS VIEWED_DATE,
