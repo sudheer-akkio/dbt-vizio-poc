@@ -26,8 +26,9 @@ __pycache__/
 *.swo
 .DS_Store
 
-# Icons
+# macOS Icons (Icon with carriage return)
 Icon
 Icon?
+Icon
 *.ico
 .ico
