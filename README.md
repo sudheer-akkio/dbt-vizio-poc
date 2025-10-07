@@ -63,8 +63,11 @@ dbt-vizio-poc/
 │   ├── vizio_daily_fact_commercial_detail.sql
 │   ├── vizio_daily_fact_standard_summary.sql
 │   ├── vizio_daily_fact_standard_detail.sql
-│   ├── vizio_campaign_attribution.sql
-│   └── vizio_attributes_latest.sql
+│   ├── vizio_campaign_nothing_bundt_cakes.sql
+│   ├── vizio_campaign_farm_bureau_financial_services.sql
+│   ├── v_akkio_attributes_latest.sql
+│   ├── v_agg_akkio_hh.sql
+│   └── v_agg_akkio_ind.sql
 ├── tests/                     # Singular SQL tests
 ├── packages.yml               # dbt package dependencies
 ├── dbt_project.yml            # Project configuration
@@ -89,12 +92,15 @@ dbt-vizio-poc/
    - `vizio_daily_fact_standard_detail` - Granular device activity sessions
 
 4. **Campaign Attribution**
-   - `vizio_campaign_attribution` - Campaign impression and market data
+   - `vizio_campaign_nothing_bundt_cakes` - Nothing Bundt Cakes campaign impression and market data
+   - `vizio_campaign_farm_bureau_financial_services` - Farm Bureau Financial Services campaign data
 
 ### Dimension Tables
 
-1. **Device Attributes**
-   - `vizio_attributes_latest` - Latest device attributes (placeholder)
+1. **Device & Household Attributes**
+   - `v_akkio_attributes_latest` - Latest demographic attributes from Experian (decoded)
+   - `v_agg_akkio_hh` - Household-level aggregation of demographic attributes
+   - `v_agg_akkio_ind` - Individual-level aggregation with IP addresses from activity tables
 
 ## Development Workflow
 

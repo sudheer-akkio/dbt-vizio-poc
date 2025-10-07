@@ -3,6 +3,25 @@
 ## Overview
 This implementation creates a comprehensive data modeling layer for Vizio TV viewing data, following the same detail/summary pattern as the LG Ads reference models. All models output to `akkio.vizio_poc` database/schema.
 
+### Model Inventory (11 Total Models)
+
+**Fact Tables (6 models):**
+- `vizio_daily_fact_content_detail` - Granular content viewing sessions
+- `vizio_daily_fact_content_summary` - Daily aggregated content viewing
+- `vizio_daily_fact_commercial_detail` - Granular commercial/ad views
+- `vizio_daily_fact_commercial_summary` - Daily aggregated commercial/ad views
+- `vizio_daily_fact_standard_detail` - Granular device activity sessions
+- `vizio_daily_fact_standard_summary` - Daily aggregated device activity
+
+**Campaign Attribution Tables (2 models):**
+- `vizio_campaign_nothing_bundt_cakes` - Nothing Bundt Cakes campaign impressions
+- `vizio_campaign_farm_bureau_financial_services` - Farm Bureau Financial Services campaign impressions
+
+**Demographic & Household Tables (3 models):**
+- `v_akkio_attributes_latest` - Latest demographic attributes from Experian (decoded)
+- `v_agg_akkio_hh` - Household-level demographic aggregation
+- `v_agg_akkio_ind` - Individual-level demographic aggregation with IP collection
+
 ## Data Architecture
 
 ### 1. Content Viewing Models
@@ -46,21 +65,48 @@ This implementation creates a comprehensive data modeling layer for Vizio TV vie
 - Provides first/last activity times and total session counts
 - Includes device timezone for local time conversion analysis
 
-### 4. Campaign Attribution Model
-**Source:** `nothing_bundt_cakes_attr_data_akkio_poc` + `nothing_bundt_cakes_pop_data_akkio_poc`
+### 4. Campaign Attribution Models
+**Sources:** Campaign-specific attribution and population data tables
 
-- **vizio_campaign_attribution.sql**: Campaign impression tracking with market reach data
+- **vizio_campaign_nothing_bundt_cakes.sql**: Nothing Bundt Cakes campaign impression tracking
+- **vizio_campaign_farm_bureau_financial_services.sql**: Farm Bureau Financial Services campaign tracking
 
 **Key Features:**
 - Joins with `mk_akkio_tvtimezone_mapping` for timezone enrichment
 - Links impressions to market TV population for reach analysis
-- Captures show context during impression
+- Captures show context during impression (title, station, channel affiliate)
 - Tracks local vs national broadcast
 - Includes session type and source information
 - Includes device timezone for local time conversion analysis
 
-### 5. Attributes Model (Placeholder)
-- **vizio_attributes_latest.sql**: Left empty as requested (awaiting additional data source)
+### 5. Demographic Attributes Models
+**Source:** `mk_akkio_experian_demo` (Experian demographic data)
+
+- **v_akkio_attributes_latest.sql**: Latest demographic and household attributes with decoded Experian fields
+- **v_agg_akkio_hh.sql**: Household-level aggregation for audience targeting
+- **v_agg_akkio_ind.sql**: Individual-level aggregation with IP addresses collected from activity tables
+
+**Key Features - v_akkio_attributes_latest:**
+- Decodes Experian demographic data into categorical columns
+- Household composition analysis (not individual binary flags)
+- Deterministic deduplication strategy for reproducible results
+- Decoded attributes: Gender, Age (with buckets), Education Level, Ethnicity, Income (with brackets)
+- Household composition flags: Home ownership, marital status, presence of children
+- Data quality indicators for filtering
+
+**Key Features - v_agg_akkio_hh:**
+- Household-level grain (AKKIO_HH_ID)
+- Fixed weight value of 11 per requirements
+- Home ownership, household income, and income bracket
+- Clustered by (PARTITION_DATE, AKKIO_HH_ID)
+
+**Key Features - v_agg_akkio_ind:**
+- Individual-level grain (AKKIO_ID)
+- Fixed weight value of 11 per requirements
+- Demographics: Gender, Age, Age Bucket
+- IP addresses aggregated from all activity tables (content, commercial, standard, campaigns)
+- Placeholder fields for future enrichment: MAIDS, EMAILS, PHONES
+- Clustered by (PARTITION_DATE, AKKIO_ID)
 
 ## Data Transformations
 
@@ -115,30 +161,76 @@ Dependency graph:
 ```
 Sources (Delta Share)
   ↓
-Detail Models (content, commercial, standard, attribution)
-  ↓
-Summary Models (content, commercial, standard)
+├─ Detail Models (content, commercial, standard)
+│    ↓
+├─ Summary Models (content, commercial, standard)
+│
+├─ Campaign Models (nothing_bundt_cakes, farm_bureau_financial_services)
+│
+└─ Attributes Models
+     └─ v_akkio_attributes_latest
+          ↓
+     ├─ v_agg_akkio_hh (household aggregation)
+     └─ v_agg_akkio_ind (individual aggregation, depends on detail tables for IPs)
 ```
 
 Build with: `dbt build --models vizio`
 
 ## Campaign Attribution Use Cases
 
-The Nothing Bundt Cakes attribution data can be analyzed against:
+The campaign attribution data (Nothing Bundt Cakes and Farm Bureau Financial Services) can be analyzed against:
 1. **Content detail/summary**: Match TV_IDs and dates to see what content viewers watched
 2. **Commercial detail/summary**: Identify co-viewing patterns with other commercials
 3. **Standard detail/summary**: Analyze device activity patterns of exposed viewers
+4. **Attributes & Aggregations**: Enrich campaign viewers with demographic and household attributes
 
-Join pattern:
+Join pattern examples:
 ```sql
+-- Campaign + Content viewing
 SELECT 
   ca.*,
   cs.*
-FROM vizio_campaign_attribution ca
+FROM vizio_campaign_nothing_bundt_cakes ca
 LEFT JOIN vizio_daily_fact_content_summary cs
   ON ca.tv_id = cs.tv_id 
   AND ca.partition_date = cs.partition_date
+
+-- Campaign + Demographics
+SELECT 
+  ca.*,
+  attr.*,
+  hh.*
+FROM vizio_campaign_farm_bureau_financial_services ca
+LEFT JOIN v_akkio_attributes_latest attr
+  ON ca.akkio_id = attr.akkio_id
+LEFT JOIN v_agg_akkio_hh hh
+  ON ca.akkio_id = hh.akkio_hh_id
+  AND ca.partition_date = hh.partition_date
 ```
+
+## Demographic Enrichment Use Cases
+
+The new demographic attributes models enable rich audience segmentation:
+
+1. **Household Analysis**: Use `v_agg_akkio_hh` for household-level insights
+   - Income bracket analysis
+   - Home ownership patterns
+   - Household composition
+
+2. **Individual Analysis**: Use `v_agg_akkio_ind` for device/person-level insights
+   - Age and gender demographics
+   - IP address tracking across activities
+   - Cross-device behavior (when enriched with MAIDs)
+
+3. **Campaign + Demographics**: Join campaign data with attributes
+   - Target audience verification
+   - Lookalike audience building
+   - Campaign effectiveness by demographic segment
+
+4. **Content + Demographics**: Analyze viewing patterns by demographics
+   - Genre preferences by age/gender
+   - Viewing duration by household income
+   - Network affinity by education level
 
 ## Tags and Annotations
 
@@ -156,7 +248,8 @@ Models include Akkio-specific tags:
 2. **Test source connections**: `dbt debug` to verify Delta Share access
 3. **Run models**: `dbt run --models vizio`
 4. **Validate data**: `dbt test --models vizio`
-5. **Add attributes source**: Update `vizio_attributes_latest.sql` when location data source is available
+5. **Explore demographic data**: Query `v_akkio_attributes_latest` to understand audience composition
+6. **Build audience segments**: Use aggregation tables for targeting and campaign analysis
 
 ## Notes
 
