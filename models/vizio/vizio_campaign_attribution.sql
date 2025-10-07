@@ -24,7 +24,8 @@ attribution_detail AS (
         a.local_or_national AS LOCAL_OR_NATIONAL,
         a.session_type AS SESSION_TYPE,
         a.session_source AS SESSION_SOURCE,
-        p.inscape_tv_population AS MARKET_TV_POPULATION
+        p.inscape_tv_population AS MARKET_TV_POPULATION,
+        tz.timezone AS TIMEZONE
     FROM attr_data a
     LEFT JOIN pop_data p
         ON a.market = p.market
@@ -38,7 +39,7 @@ SELECT
     TV_ID,
     HASHED_IP,
     IMPRESSION_TIMESTAMP,
-    tz.timezone AS TIMEZONE,
+    TIMEZONE,
     ZIP_CODE,
     MARKET,
     MARKET_TV_POPULATION,
@@ -48,7 +49,5 @@ SELECT
     LOCAL_OR_NATIONAL,
     SESSION_TYPE,
     SESSION_SOURCE
-FROM attribution_detail ad
-LEFT JOIN timezone_mapping tz
-    ON ad.TV_ID = tz.hash
+FROM attribution_detail
 

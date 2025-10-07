@@ -9,7 +9,7 @@ WITH
 content AS (SELECT * FROM {{ source('vizio_poc_share', 'production_r2079_content_with_null') }}),
 genre_mapping AS (SELECT * FROM {{ source('vizio_poc_share', 'mk_akkio_genre_title_mapping') }}),
 timezone_mapping AS (SELECT * FROM {{ source('vizio_poc_share', 'mk_akkio_tvtimezone_mapping') }}),
-raw_content AS (
+enriched_content AS (
     SELECT
         c.date_partition AS PARTITION_DATE,
         c.date_partition AS VIEWED_DATE,
@@ -29,20 +29,15 @@ raw_content AS (
         c.input_category,
         c.input_device AS INPUT_DEVICE_NAME,
         c.app_service,
-        g.genre AS PROGRAM_GENRE
+        g.genre AS PROGRAM_GENRE,
+        tz.timezone AS TIMEZONE
     FROM content c
     LEFT JOIN genre_mapping g
         ON c.episode_id = g.episode_id
+    LEFT JOIN timezone_mapping tz
+        ON c.hash = tz.hash
     WHERE c.show_title IS NOT NULL 
         AND c.hash IS NOT NULL
-),
-enriched_content AS (
-    SELECT 
-        rc.*,
-        tz.timezone AS TIMEZONE
-    FROM raw_content rc
-    LEFT JOIN timezone_mapping tz
-        ON rc.TV_ID = tz.hash
 )
 SELECT 
     PARTITION_DATE,

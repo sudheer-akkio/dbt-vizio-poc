@@ -1,13 +1,37 @@
 {{ config(
-    materialized='table',
-    unique_key = ['PARTITION_DATE', 'TV_ID'],
-    post_hook=[
-        "alter table {{this}} cluster by (partition_date, tv_id)"
-    ]
+    materialized='incremental',
+    unique_key=['PARTITION_DATE', 'TV_ID'],
+    incremental_strategy='merge',
+    partition_by="PARTITION_DATE"
 )}}
 
 WITH 
-detail AS (SELECT * FROM {{ ref('vizio_daily_fact_commercial_detail') }} )
+detail AS (
+    SELECT 
+        PARTITION_DATE,
+        TV_ID,
+        TIMEZONE,
+        ZIP_CODE,
+        DMA,
+        CREATIVE_ID,
+        BRAND_NAME,
+        AD_TITLE,
+        COMMERCIAL_CATEGORY,
+        PREV_TITLE,
+        PREV_CALLSIGN,
+        PREV_NETWORK,
+        NEXT_TITLE,
+        NEXT_CALLSIGN,
+        NEXT_NETWORK,
+        INPUT_CATEGORY,
+        INPUT_DEVICE_NAME,
+        APP_SERVICE,
+        AD_LENGTH
+    FROM {{ ref('vizio_daily_fact_commercial_detail') }}
+    {% if is_incremental() %}
+        WHERE PARTITION_DATE > (SELECT MAX(PARTITION_DATE) FROM {{ this }})
+    {% endif %}
+)
 SELECT
     PARTITION_DATE,
     PARTITION_DATE AS VIEWED_DATE,

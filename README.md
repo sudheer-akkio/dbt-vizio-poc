@@ -44,6 +44,9 @@ dbt run
 # Run specific model
 dbt run --select vizio_daily_fact_content_summary
 
+# For models that have set materialized='incremental', if you want to do a full refresh on data load:
+dbt run --full-refresh --select vizio_daily_fact_commercial_detail vizio_daily_fact_commercial_summary
+
 # Build and test together
 dbt build --select vizio
 ```
