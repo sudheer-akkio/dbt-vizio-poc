@@ -12,6 +12,7 @@ SELECT
     i.date_partition AS PARTITION_DATE,
     i.date_partition AS ACTIVITY_DATE,
     i.hash AS TV_ID,
+    i.hash AS AKKIO_ID,
     i.ip AS HASHED_IP,
     tz.timezone AS TIMEZONE,
     i.ts_start AS SESSION_START_TIME_UTC,

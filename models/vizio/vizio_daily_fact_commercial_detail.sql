@@ -1,11 +1,8 @@
 {{ config(
     materialized='incremental',
-    unique_key=['PARTITION_DATE', 'TV_ID', 'CREATIVE_ID', 'AD_MATCH_START_TIME_UTC'],
+    unique_key=['PARTITION_DATE', 'TV_ID'],
     incremental_strategy='merge',
     partition_by="PARTITION_DATE",
-    pre_hook=[
-        "SET statement_timeout = 14400",
-    ]
 )}}
 
 WITH 
@@ -41,7 +38,11 @@ commercial_filtered AS (
         app_service
     FROM {{ source('vizio_poc_share', 'production_r2080_commercialfeedmodular') }}
     WHERE hash IS NOT NULL
-    {% if is_incremental() %}
+    {% if var('start_date', None) and var('end_date', None) %}
+        -- Batch processing mode: use --vars '{"start_date": "2024-01-01", "end_date": "2024-01-31"}'
+        AND date_partition BETWEEN '{{ var("start_date") }}' AND '{{ var("end_date") }}'
+    {% elif is_incremental() %}
+        -- Normal incremental mode: process only new data
         AND date_partition > (SELECT MAX(PARTITION_DATE) FROM {{ this }})
     {% endif %}
 ),
@@ -64,6 +65,7 @@ enriched_commercial AS (
         c.date_partition AS PARTITION_DATE,
         c.date_partition AS VIEWED_DATE,
         c.hash AS TV_ID,
+        c.hash AS AKKIO_ID,
         c.ip AS HASHED_IP,
         c.zipcode AS ZIP_CODE,
         c.dma AS DMA,

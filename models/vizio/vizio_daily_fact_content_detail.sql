@@ -43,6 +43,7 @@ SELECT
     PARTITION_DATE,
     VIEWED_DATE,
     TV_ID,
+    TV_ID AS AKKIO_ID,
     HASHED_IP,
     ZIP_CODE,
     DMA,

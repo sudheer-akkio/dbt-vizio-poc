@@ -63,6 +63,11 @@ models:
               to: ref('vizio_daily_fact_content_detail')
               field: TV_ID
               severity: warn
+      - name: AKKIO_ID
+        description: Primary device identifier from Akkio (optimized - same value as TV_ID)
+        data_tests:
+          - not_null
+          - unique
       - name: TIMEZONE
         description: Timezone of the TV device for local time conversion
       - name: ZIP_CODE_ARRAY
@@ -123,6 +128,11 @@ models:
         description: Device ID hash for the TV Device
         data_tests:
           - not_null
+      - name: AKKIO_ID
+        description: Primary device identifier from Akkio (optimized - same value as TV_ID)
+        data_tests:
+          - not_null
+          - unique
       - name: HASHED_IP
         description: sha1 hash of IPv4 Address postfixed with salt
       - name: ZIP_CODE
@@ -273,6 +283,11 @@ models:
         description: Device ID hash for the TV Device
         data_tests:
           - not_null
+      - name: AKKIO_ID
+        description: Primary device identifier from Akkio (optimized - same value as TV_ID)
+        data_tests:
+          - not_null
+          - unique
       - name: HASHED_IP
         description: sha1 hash of IPv4 Address postfixed with salt
       - name: ZIP_CODE
@@ -359,6 +374,11 @@ models:
         description: Device ID hash for the TV Device
         data_tests:
           - not_null
+      - name: AKKIO_ID
+        description: Primary device identifier from Akkio (optimized - same value as TV_ID)
+        data_tests:
+          - not_null
+          - unique
       - name: TIMEZONE
         description: Timezone of the TV device for local time conversion
       - name: ZIP_CODE_ARRAY
@@ -413,6 +433,11 @@ models:
         description: Device ID hash for the TV Device
         data_tests:
           - not_null
+      - name: AKKIO_ID
+        description: Primary device identifier from Akkio (optimized - same value as TV_ID)
+        data_tests:
+          - not_null
+          - unique
       - name: HASHED_IP
         description: sha1 hash of IPv4 Address postfixed with salt
       - name: TIMEZONE
@@ -458,6 +483,11 @@ models:
         description: Device ID hash for the TV Device
         data_tests:
           - not_null
+      - name: AKKIO_ID
+        description: Primary device identifier from Akkio (optimized - same value as TV_ID)
+        data_tests:
+          - not_null
+          - unique
       - name: HASHED_IP
         description: sha1 hash of IPv4 Address postfixed with salt
       - name: IMPRESSION_TIMESTAMP
@@ -491,7 +521,7 @@ models:
       - name: SESSION_SOURCE
         description: Source of the viewing session data
 
-  - name: vizio_attributes_latest
+  - name: v_akkio_attributes_latest
     description: >
       Latest demographic and household attributes from Experian for each TV device.
       This table provides decoded (non-one-hot-encoded) demographic, socioeconomic, and household composition data
@@ -500,14 +530,24 @@ models:
     data_tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
-            - TVID
+            - TV_ID
     columns:
       - name: PARTITION_DATE
         description: partition_date derived from match_date | :akkio-context-ignore |<
         data_tests:
           - not_null
-      - name: TVID
-        description: Device ID hash for the TV Device (joins to TV_ID in other tables)
+      - name: AKKIO_ID
+        description: Primary device identifier from Akkio (optimized - same value as TV_ID and AKKIO_HH_ID)
+        data_tests:
+          - not_null
+          - unique
+      - name: TV_ID
+        description: Device ID hash for the TV Device (joins to TV_ID in other tables, optimized - same value as AKKIO_ID)
+        data_tests:
+          - not_null
+          - unique
+      - name: AKKIO_HH_ID
+        description: Household identifier from Akkio (optimized - same value as AKKIO_ID and TV_ID)
         data_tests:
           - not_null
           - unique
@@ -566,3 +606,92 @@ models:
         description: Demographic data incomplete indicator (Y/N)
       - name: DBT_UPDATED_AT
         description: Timestamp when record was processed by dbt
+
+  - name: v_agg_akkio_ind
+    description: >
+      Individual-level aggregation of demographic attributes derived from v_akkio_attributes_latest.
+      This table provides a simplified view with demographic data and contact identifiers.
+      IPS are aggregated from all activity tables (content, commercial, standard activity, campaign attribution).
+      Grain: One row per AKKIO_ID (individual device/person).
+      | :short-name:individual_demographics: :use_for_audience_gen: |<
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - AKKIO_ID
+    columns:
+      - name: AKKIO_ID
+        description: Primary device identifier from Akkio
+        data_tests:
+          - not_null
+          - unique
+      - name: AKKIO_HH_ID
+        description: Household identifier from Akkio (same value as AKKIO_ID in current implementation)
+        data_tests:
+          - not_null
+      - name: WEIGHT
+        description: Individual weighting factor for analytics (fixed at 11)
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_values:
+              values: [11]
+      - name: GENDER
+        description: Gender of primary viewer (Male/Female)
+      - name: AGE
+        description: Age of primary viewer (median of age range bucket)
+        data_tests:
+          - dbt_utils.accepted_range:
+              min_value: 18
+              max_value: 100
+              severity: warn
+      - name: AGE_BUCKET
+        description: Age range bucket label (18-24, 25-34, 35-44, 45-54, 55-64, 65+)
+      - name: MAIDS
+        description: Mobile Advertising IDs associated with individual (placeholder for future enrichment)
+      - name: IPS
+        description: Array of unique hashed IP addresses associated with individual, aggregated from all activity tables (content viewing, commercial viewing, standard activity, campaign attribution)
+      - name: EMAILS
+        description: Email addresses associated with individual (placeholder for future enrichment)
+      - name: PHONES
+        description: Phone numbers associated with individual (placeholder for future enrichment)
+      - name: PARTITION_DATE
+        description: partition_date derived from match_date | :akkio-context-ignore |<
+        data_tests:
+          - not_null
+
+  - name: v_agg_akkio_hh
+    description: >
+      Household-level aggregation of demographic attributes derived from v_akkio_attributes_latest.
+      This table provides household-specific attributes like home ownership and income.
+      Grain: One row per AKKIO_HH_ID (household).
+      | :short-name:household_demographics: :use_for_audience_gen: |<
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - AKKIO_HH_ID
+    columns:
+      - name: AKKIO_HH_ID
+        description: Household identifier from Akkio
+        data_tests:
+          - not_null
+          - unique
+      - name: HH_WEIGHT
+        description: Household weighting factor for analytics (fixed at 11)
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_values:
+              values: [11]
+      - name: HOMEOWNER
+        description: Home ownership status (Owner, Renter)
+      - name: INCOME
+        description: Household income in thousands (median of income range bucket)
+        data_tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 500
+              severity: warn
+      - name: INCOME_BRACKET
+        description: Household income range label ($0-35K through $200K+)
+      - name: PARTITION_DATE
+        description: partition_date derived from match_date | :akkio-context-ignore |<
+        data_tests:
+          - not_null

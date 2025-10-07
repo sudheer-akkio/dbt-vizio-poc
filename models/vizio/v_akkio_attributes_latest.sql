@@ -1,7 +1,7 @@
 {{ config(
     materialized='table',
     post_hook=[    
-        "alter table {{this}} cluster by (match_date, tvid)", 
+        "alter table {{this}} cluster by (match_date, TV_ID)", 
     ]
 )}}
 
@@ -13,7 +13,7 @@
     columns for audience segmentation and targeting use cases.
     
     Source: akkio.akkio_common.mac_vizio_synethic (to be updated)
-    Key: tvid - Links to all other Vizio fact tables for audience analytics
+    Keys: AKKIO_ID, TV_ID, AKKIO_HH_ID (all contain same value, optimized copies)
     
     Decoded Attributes:
     - Gender: Single column (Male/Female)
@@ -24,14 +24,19 @@
     - Other household attributes as Y/N flags
 */
 
+-- Optimized: AKKIO_ID, TV_ID, and AKKIO_HH_ID all reference AKKIO_ID
+-- These are separate columns but contain the same value for downstream compatibility
+
 WITH source_attributes AS (
     SELECT * FROM {{ source('akkio_common', 'mac_vizio_synthetic') }}
 ),
 
 attributes_decoded AS (
     SELECT
-        -- Primary Key
-        AKKIO_ID AS TVID,
+        -- Primary Keys (all reference same ID for optimization)
+        AKKIO_ID,
+        AKKIO_ID AS TV_ID,
+        AKKIO_ID AS AKKIO_HH_ID,
         
         -- Temporal
         match_date AS MATCH_DATE,
@@ -166,7 +171,7 @@ latest_records AS (
     SELECT 
         *,
         ROW_NUMBER() OVER (
-            PARTITION BY TVID 
+            PARTITION BY TV_ID 
             ORDER BY MATCH_DATE DESC, DBT_UPDATED_AT DESC
         ) AS row_num
     FROM attributes_decoded
@@ -175,7 +180,9 @@ latest_records AS (
 SELECT
     -- Keys and Temporal
     PARTITION_DATE,
-    TVID,
+    AKKIO_ID,
+    TV_ID,
+    AKKIO_HH_ID,
     MATCH_DATE,
     
     -- Demographics (Decoded)

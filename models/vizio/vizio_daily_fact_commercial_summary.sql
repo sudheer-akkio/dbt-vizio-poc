@@ -3,9 +3,6 @@
     unique_key=['PARTITION_DATE', 'TV_ID'],
     incremental_strategy='merge',
     partition_by="PARTITION_DATE",
-    pre_hook=[
-        "SET statement_timeout = 14400",
-    ]
 )}}
 
 WITH 
@@ -39,6 +36,7 @@ SELECT
     PARTITION_DATE,
     PARTITION_DATE AS VIEWED_DATE,
     TV_ID,
+    TV_ID AS AKKIO_ID,
     MAX(TIMEZONE) AS TIMEZONE,
     collect_set(ZIP_CODE) AS ZIP_CODE_ARRAY,
     collect_set(DMA) AS DMA_ARRAY,

@@ -1,0 +1,98 @@
+{{ config(
+    materialized='table',
+    post_hook=[    
+        "alter table {{this}} cluster by (PARTITION_DATE, AKKIO_ID)", 
+    ]
+)}}
+
+/*
+    Vizio Individual Aggregation Table
+    
+    Purpose: Individual-level aggregation of demographic attributes for analytics.
+    Source: v_akkio_attributes_latest + IP aggregation from activity tables
+    Grain: One row per AKKIO_ID (individual device/person)
+    
+    IPS: Aggregated from all detail tables (content, commercial, standard activity, campaign attribution)
+    MAIDS, EMAILS, PHONES: Placeholders for potential future enrichment from additional data sources
+*/
+
+WITH 
+-- Collect all unique IPs from content viewing activity
+content_ips AS (
+    SELECT 
+        AKKIO_ID,
+        HASHED_IP
+    FROM {{ ref('vizio_daily_fact_content_detail') }}
+    WHERE HASHED_IP IS NOT NULL
+),
+
+-- Collect all unique IPs from commercial viewing activity
+commercial_ips AS (
+    SELECT 
+        AKKIO_ID,
+        HASHED_IP
+    FROM {{ ref('vizio_daily_fact_commercial_detail') }}
+    WHERE HASHED_IP IS NOT NULL
+),
+
+-- Collect all unique IPs from standard device activity
+standard_ips AS (
+    SELECT 
+        AKKIO_ID,
+        HASHED_IP
+    FROM {{ ref('vizio_daily_fact_standard_detail') }}
+    WHERE HASHED_IP IS NOT NULL
+),
+
+-- Collect all unique IPs from campaign attribution
+campaign_ips AS (
+    SELECT 
+        AKKIO_ID,
+        HASHED_IP
+    FROM {{ ref('vizio_campaign_attribution') }}
+    WHERE HASHED_IP IS NOT NULL
+),
+
+-- Union all IP sources and aggregate by AKKIO_ID
+aggregated_ips AS (
+    SELECT 
+        AKKIO_ID,
+        COLLECT_SET(HASHED_IP) AS IPS_ARRAY
+    FROM (
+        SELECT AKKIO_ID, HASHED_IP FROM content_ips
+        UNION ALL
+        SELECT AKKIO_ID, HASHED_IP FROM commercial_ips
+        UNION ALL
+        SELECT AKKIO_ID, HASHED_IP FROM standard_ips
+        UNION ALL
+        SELECT AKKIO_ID, HASHED_IP FROM campaign_ips
+    )
+    GROUP BY AKKIO_ID
+)
+
+SELECT
+    -- Primary Keys
+    attr.AKKIO_ID,
+    attr.AKKIO_HH_ID,
+    
+    -- Weight (fixed at 11 per requirements)
+    11 AS WEIGHT,
+    
+    -- Demographics
+    attr.GENDER,
+    attr.AGE,
+    attr.AGE_BUCKET,
+    
+    -- Contact identifiers
+    0 AS MAIDS,
+    -- ips.IPS_ARRAY AS IPS,
+    0 AS IPS,
+    0 AS EMAILS,
+    0 AS PHONES,
+    
+    -- Temporal
+    attr.PARTITION_DATE
+
+FROM {{ ref('v_akkio_attributes_latest') }} attr
+LEFT JOIN aggregated_ips ips
+    ON attr.AKKIO_ID = ips.AKKIO_ID
