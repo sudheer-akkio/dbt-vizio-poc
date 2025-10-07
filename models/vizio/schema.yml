@@ -512,11 +512,11 @@ models:
           - not_null
           - unique
       - name: MATCH_DATE
-        description: Timestamp when the demographic data was matched to the device
+        description: Timestamp when the demographic data was matched to the device | :akkio-ml-ignore |<
         data_tests:
           - not_null
       - name: GENDER
-        description: Gender of primary viewer (Male/Female)
+        description: Gender of primary viewer (Male/Female) | :ml-encoding-nominal |<
       - name: AGE
         description: Age of primary viewer (median of age range bucket)
         data_tests:
@@ -525,11 +525,11 @@ models:
               max_value: 100
               severity: warn
       - name: AGE_BUCKET
-        description: Age range bucket label (18-24, 25-34, 35-44, 45-54, 55-64, 65+)
+        description: Age range bucket label (18-24, 25-34, 35-44, 45-54, 55-64, 65+) | :akkio-ml-ignore |<
       - name: EDUCATION_LEVEL
-        description: Highest education level attained (Graduate, College, Some College, High School)
+        description: Highest education level attained (Graduate, College, Some College, High School) 
       - name: ETHNICITY
-        description: Ethnicity classification (African American, Asian, White Non-Hispanic, Hispanic, Middle Eastern, Native American, Other, Unknown)
+        description: Ethnicity classification (African American, Asian, White Non-Hispanic, Hispanic, Middle Eastern, Native American, Other, Unknown) | :ml-encoding-nominal |<
       - name: SPANISH_LANGUAGE
         description: Spanish language preference indicator (Y/N)
       - name: MARITAL_STATUS
@@ -544,7 +544,7 @@ models:
               max_value: 500
               severity: warn
       - name: INCOME_BRACKET
-        description: Household income range label ($0-35K through $200K+)
+        description: Household income range label ($0-35K through $200K+) | :akkio-ml-ignore |<
       - name: HAS_BABIES_0_3
         description: Presence of babies aged 0-3 in household (Y/N)
       - name: HAS_CHILDREN_0_18
@@ -565,4 +565,5 @@ models:
       - name: DEMO_INCOMPLETE_FLAG
         description: Demographic data incomplete indicator (Y/N)
       - name: DBT_UPDATED_AT
-        description: Timestamp when record was processed by dbt
+        description: Timestamp when record was processed by dbt | :akkio-ml-ignore |<
+
