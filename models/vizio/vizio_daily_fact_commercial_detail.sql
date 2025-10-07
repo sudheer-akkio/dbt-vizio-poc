@@ -2,7 +2,10 @@
     materialized='incremental',
     unique_key=['PARTITION_DATE', 'TV_ID', 'CREATIVE_ID', 'AD_MATCH_START_TIME_UTC'],
     incremental_strategy='merge',
-    partition_by="PARTITION_DATE"
+    partition_by="PARTITION_DATE",
+    pre_hook=[
+        "SET statement_timeout = 14400",
+    ]
 )}}
 
 WITH 
