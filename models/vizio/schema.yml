@@ -27,6 +27,8 @@ sources:
         description: Attribution data for Farm Bureau Financial Services campaign
       - name: farm_bureau_financial_services_pop_data_akkio_poc
         description: TV population data by market for Farm Bureau Financial Services campaign
+      - name: mk_akkio_experian_demo
+        description: Experian demographic data for TV devices
 
   - name: akkio_common
     database: akkio
@@ -599,7 +601,7 @@ models:
             - TV_ID
     columns:
       - name: PARTITION_DATE
-        description: partition_date derived from match_date | :akkio-context-ignore |<
+        description: Current date when model was run (used for table partitioning) | :akkio-context-ignore |<
         data_tests:
           - not_null
       - name: AKKIO_ID
@@ -617,10 +619,6 @@ models:
         data_tests:
           - not_null
           - unique
-      - name: MATCH_DATE
-        description: Timestamp when the demographic data was matched to the device | :akkio-ml-ignore |<
-        data_tests:
-          - not_null
       - name: GENDER
         description: Gender of primary viewer (Male/Female) | :ml-encoding-nominal |<
       - name: AGE

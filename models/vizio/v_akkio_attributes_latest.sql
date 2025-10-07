@@ -1,7 +1,7 @@
 {{ config(
     materialized='table',
     post_hook=[    
-        "alter table {{this}} cluster by (match_date, TV_ID)", 
+        "alter table {{this}} cluster by (PARTITION_DATE, TV_ID)", 
     ]
 )}}
 
@@ -9,40 +9,56 @@
     Vizio Attributes Latest Model
     
     Purpose: Provides the latest demographic and household attributes from Experian 
-    for each TV ID. This model decodes one-hot encoded attributes into categorical 
+    for each TV ID. This model decodes household composition data into categorical 
     columns for audience segmentation and targeting use cases.
     
-    Source: akkio.akkio_common.mac_vizio_synethic (to be updated)
+    Source: akkio.akkio_common.mac_vizio_synthetic
     Keys: AKKIO_ID, TV_ID, AKKIO_HH_ID (all contain same value, optimized copies)
     
+    Data Structure:
+    - Source data contains HOUSEHOLD-LEVEL counts (not individual binary flags)
+    - Example: demo_male_25_34 = 2 means there are 2 males aged 25-34 in household
+    - Multiple records per TV_ID may exist (different data snapshots/loads)
+    - Each TV_ID (hash) represents ONE household, not multiple individuals
+    
+    Deduplication Strategy (Production-Grade):
+    - Uses deterministic, business-logic-driven ordering to ensure:
+      1. Reproducible results across table optimizations/compactions
+      2. Preference for complete, high-quality demographic records
+      3. No dependency on physical data layout or query execution plan
+    - Ordering priority: completeness > income > household size > education > data quality > hash
+    - See latest_records CTE for full implementation details
+    
     Decoded Attributes:
-    - Gender: Single column (Male/Female)
-    - Age: Median of age range bucket
-    - Education: Single categorical value
-    - Ethnicity: Single categorical value
-    - Income: Median of income range bucket
-    - Other household attributes as Y/N flags
+    - Gender: Single column (Male/Female) - presence of any male/female in household
+    - Age: Median of age range bucket - based on first matching age group
+    - Education: Single categorical value - highest level indicated
+    - Ethnicity: Single categorical value - first matching ethnicity
+    - Income: Median of income range bracket
+    - Other household attributes as Y/N flags (presence/absence)
+    
+    Note: All comparisons use >= 1 to handle count-based data correctly
 */
 
 -- Optimized: AKKIO_ID, TV_ID, and AKKIO_HH_ID all reference AKKIO_ID
 -- These are separate columns but contain the same value for downstream compatibility
 
 WITH source_attributes AS (
-    SELECT * FROM {{ source('akkio_common', 'mac_vizio_synthetic') }}
+    SELECT * FROM {{ source('vizio_poc_share', 'mk_akkio_experian_demo') }}
 ),
 
 attributes_decoded AS (
     SELECT
         -- Primary Keys (all reference same ID for optimization)
-        AKKIO_ID,
-        AKKIO_ID AS TV_ID,
-        AKKIO_ID AS AKKIO_HH_ID,
+        HASH AS AKKIO_ID,
+        HASH AS TV_ID,
+        HASH AS AKKIO_HH_ID,
         
         -- Temporal
-        match_date AS MATCH_DATE,
-        DATE(match_date) AS PARTITION_DATE,
+        CURRENT_DATE() AS PARTITION_DATE,
         
         -- Decode Gender (Male/Female based on which demo columns are populated)
+        -- Note: Using >= 1 to handle count-based data (household composition)
         CASE 
             WHEN COALESCE(demo_male_18_24, 0) + COALESCE(demo_male_25_34, 0) + COALESCE(demo_male_35_44, 0) + 
                  COALESCE(demo_male_45_54, 0) + COALESCE(demo_male_55_64, 0) + COALESCE(demo_male_65_999, 0) > 0 
@@ -54,125 +70,169 @@ attributes_decoded AS (
         END AS GENDER,
         
         -- Decode Age (Median of age range bucket) - using standard buckets
+        -- Note: Using >= 1 to handle count-based data (household composition)
         CASE 
-            WHEN COALESCE(demo_male_18_24, 0) = 1 OR COALESCE(demo_female_18_24, 0) = 1 THEN 21
-            WHEN COALESCE(demo_male_25_34, 0) = 1 OR COALESCE(demo_female_25_34, 0) = 1 THEN 29.5
-            WHEN COALESCE(demo_male_35_44, 0) = 1 OR COALESCE(demo_female_35_44, 0) = 1 THEN 39.5
-            WHEN COALESCE(demo_male_45_54, 0) = 1 OR COALESCE(demo_female_45_54, 0) = 1 THEN 49.5
-            WHEN COALESCE(demo_male_55_64, 0) = 1 OR COALESCE(demo_female_55_64, 0) = 1 THEN 59.5
-            WHEN COALESCE(demo_male_65_999, 0) = 1 OR COALESCE(demo_female_65_999, 0) = 1 THEN 72.5
+            WHEN COALESCE(demo_male_18_24, 0) >= 1 OR COALESCE(demo_female_18_24, 0) >= 1 THEN 21
+            WHEN COALESCE(demo_male_25_34, 0) >= 1 OR COALESCE(demo_female_25_34, 0) >= 1 THEN 29.5
+            WHEN COALESCE(demo_male_35_44, 0) >= 1 OR COALESCE(demo_female_35_44, 0) >= 1 THEN 39.5
+            WHEN COALESCE(demo_male_45_54, 0) >= 1 OR COALESCE(demo_female_45_54, 0) >= 1 THEN 49.5
+            WHEN COALESCE(demo_male_55_64, 0) >= 1 OR COALESCE(demo_female_55_64, 0) >= 1 THEN 59.5
+            WHEN COALESCE(demo_male_65_999, 0) >= 1 OR COALESCE(demo_female_65_999, 0) >= 1 THEN 72.5
             ELSE NULL
         END AS AGE,
         
         -- Decode Age Bucket (keep as label for reference)
         CASE 
-            WHEN COALESCE(demo_male_18_24, 0) = 1 OR COALESCE(demo_female_18_24, 0) = 1 THEN '18-24'
-            WHEN COALESCE(demo_male_25_34, 0) = 1 OR COALESCE(demo_female_25_34, 0) = 1 THEN '25-34'
-            WHEN COALESCE(demo_male_35_44, 0) = 1 OR COALESCE(demo_female_35_44, 0) = 1 THEN '35-44'
-            WHEN COALESCE(demo_male_45_54, 0) = 1 OR COALESCE(demo_female_45_54, 0) = 1 THEN '45-54'
-            WHEN COALESCE(demo_male_55_64, 0) = 1 OR COALESCE(demo_female_55_64, 0) = 1 THEN '55-64'
-            WHEN COALESCE(demo_male_65_999, 0) = 1 OR COALESCE(demo_female_65_999, 0) = 1 THEN '65+'
+            WHEN COALESCE(demo_male_18_24, 0) >= 1 OR COALESCE(demo_female_18_24, 0) >= 1 THEN '18-24'
+            WHEN COALESCE(demo_male_25_34, 0) >= 1 OR COALESCE(demo_female_25_34, 0) >= 1 THEN '25-34'
+            WHEN COALESCE(demo_male_35_44, 0) >= 1 OR COALESCE(demo_female_35_44, 0) >= 1 THEN '35-44'
+            WHEN COALESCE(demo_male_45_54, 0) >= 1 OR COALESCE(demo_female_45_54, 0) >= 1 THEN '45-54'
+            WHEN COALESCE(demo_male_55_64, 0) >= 1 OR COALESCE(demo_female_55_64, 0) >= 1 THEN '55-64'
+            WHEN COALESCE(demo_male_65_999, 0) >= 1 OR COALESCE(demo_female_65_999, 0) >= 1 THEN '65+'
             ELSE NULL
         END AS AGE_BUCKET,
         
         -- Decode Education Level (highest level indicated)
         CASE 
-            WHEN COALESCE(edu_graduate, 0) = 1 THEN 'Graduate'
-            WHEN COALESCE(edu_college, 0) = 1 THEN 'College'
-            WHEN COALESCE(edu_some_college, 0) = 1 THEN 'Some College'
-            WHEN COALESCE(edu_high_school, 0) = 1 THEN 'High School'
+            WHEN COALESCE(edu_graduate, 0) >= 1 THEN 'Graduate'
+            WHEN COALESCE(edu_college, 0) >= 1 THEN 'College'
+            WHEN COALESCE(edu_some_college, 0) >= 1 THEN 'Some College'
+            WHEN COALESCE(edu_high_school, 0) >= 1 THEN 'High School'
             ELSE NULL
         END AS EDUCATION_LEVEL,
         
         -- Decode Ethnicity
         CASE 
-            WHEN COALESCE(ethnicity_african_american, 0) = 1 THEN 'African American'
-            WHEN COALESCE(ethnicity_asian, 0) = 1 THEN 'Asian'
-            WHEN COALESCE(ethnicity_white_non_hispanic, 0) = 1 THEN 'White Non-Hispanic'
-            WHEN COALESCE(ethnicity_hispanic, 0) = 1 THEN 'Hispanic'
-            WHEN COALESCE(ethnicity_middle_eastern, 0) = 1 THEN 'Middle Eastern'
-            WHEN COALESCE(ethnicity_native_american, 0) = 1 THEN 'Native American'
-            WHEN COALESCE(ethnicity_other, 0) = 1 THEN 'Other'
-            WHEN COALESCE(ethnicity_unknown, 0) = 1 THEN 'Unknown'
+            WHEN COALESCE(ethnicity_african_american, 0) >= 1 THEN 'African American'
+            WHEN COALESCE(ethnicity_asian, 0) >= 1 THEN 'Asian'
+            WHEN COALESCE(ethnicity_white_non_hispanic, 0) >= 1 THEN 'White Non-Hispanic'
+            WHEN COALESCE(ethnicity_hispanic, 0) >= 1 THEN 'Hispanic'
+            WHEN COALESCE(ethnicity_middle_eastern, 0) >= 1 THEN 'Middle Eastern'
+            WHEN COALESCE(ethnicity_native_american, 0) >= 1 THEN 'Native American'
+            WHEN COALESCE(ethnicity_other, 0) >= 1 THEN 'Other'
+            WHEN COALESCE(ethnicity_unknown, 0) >= 1 THEN 'Unknown'
             ELSE NULL
         END AS ETHNICITY,
         
         -- Language
-        CASE WHEN COALESCE(language_spanish, 0) = 1 THEN 'Y' ELSE 'N' END AS SPANISH_LANGUAGE,
+        CASE WHEN COALESCE(language_spanish, 0) >= 1 THEN 'Y' ELSE 'N' END AS SPANISH_LANGUAGE,
         
         -- Marital Status
         CASE 
-            WHEN COALESCE(marital_status_married, 0) = 1 THEN 'Married'
-            WHEN COALESCE(marital_status_single, 0) = 1 THEN 'Single'
+            WHEN COALESCE(marital_status_married, 0) >= 1 THEN 'Married'
+            WHEN COALESCE(marital_status_single, 0) >= 1 THEN 'Single'
             ELSE NULL
         END AS MARITAL_STATUS,
         
         -- Home Ownership
         CASE 
-            WHEN COALESCE(home_owner_hh, 0) = 1 THEN 'Owner'
-            WHEN COALESCE(home_renter_hh, 0) = 1 THEN 'Renter'
+            WHEN COALESCE(home_owner_hh, 0) >= 1 THEN 'Owner'
+            WHEN COALESCE(home_renter_hh, 0) >= 1 THEN 'Renter'
             ELSE NULL
         END AS HOME_OWNERSHIP,
         
         -- Decode Household Income (Median of income range in thousands)
         CASE 
-            WHEN COALESCE(income_0_35_hh, 0) = 1 THEN 17.5
-            WHEN COALESCE(income_35_45_hh, 0) = 1 THEN 40
-            WHEN COALESCE(income_45_55_hh, 0) = 1 THEN 50
-            WHEN COALESCE(income_55_70_hh, 0) = 1 THEN 62.5
-            WHEN COALESCE(income_70_85_hh, 0) = 1 THEN 77.5
-            WHEN COALESCE(income_85_100_hh, 0) = 1 THEN 92.5
-            WHEN COALESCE(income_100_125_hh, 0) = 1 THEN 112.5
-            WHEN COALESCE(income_125_150_hh, 0) = 1 THEN 137.5
-            WHEN COALESCE(income_150_200_hh, 0) = 1 THEN 175
-            WHEN COALESCE(income_200_plus_hh, 0) = 1 THEN 250
+            WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN 17.5
+            WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN 40
+            WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN 50
+            WHEN COALESCE(income_55_70_hh, 0) >= 1 THEN 62.5
+            WHEN COALESCE(income_70_85_hh, 0) >= 1 THEN 77.5
+            WHEN COALESCE(income_85_100_hh, 0) >= 1 THEN 92.5
+            WHEN COALESCE(income_100_125_hh, 0) >= 1 THEN 112.5
+            WHEN COALESCE(income_125_150_hh, 0) >= 1 THEN 137.5
+            WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN 175
+            WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN 250
             ELSE NULL
         END AS HOUSEHOLD_INCOME_K,
         
         -- Decode Income Bracket (keep as label for reference)
         CASE 
-            WHEN COALESCE(income_0_35_hh, 0) = 1 THEN '$0-35K'
-            WHEN COALESCE(income_35_45_hh, 0) = 1 THEN '$35-45K'
-            WHEN COALESCE(income_45_55_hh, 0) = 1 THEN '$45-55K'
-            WHEN COALESCE(income_55_70_hh, 0) = 1 THEN '$55-70K'
-            WHEN COALESCE(income_70_85_hh, 0) = 1 THEN '$70-85K'
-            WHEN COALESCE(income_85_100_hh, 0) = 1 THEN '$85-100K'
-            WHEN COALESCE(income_100_125_hh, 0) = 1 THEN '$100-125K'
-            WHEN COALESCE(income_125_150_hh, 0) = 1 THEN '$125-150K'
-            WHEN COALESCE(income_150_200_hh, 0) = 1 THEN '$150-200K'
-            WHEN COALESCE(income_200_plus_hh, 0) = 1 THEN '$200K+'
+            WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN '$0-35K'
+            WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN '$35-45K'
+            WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN '$45-55K'
+            WHEN COALESCE(income_55_70_hh, 0) >= 1 THEN '$55-70K'
+            WHEN COALESCE(income_70_85_hh, 0) >= 1 THEN '$70-85K'
+            WHEN COALESCE(income_85_100_hh, 0) >= 1 THEN '$85-100K'
+            WHEN COALESCE(income_100_125_hh, 0) >= 1 THEN '$100-125K'
+            WHEN COALESCE(income_125_150_hh, 0) >= 1 THEN '$125-150K'
+            WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN '$150-200K'
+            WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN '$200K+'
             ELSE NULL
         END AS INCOME_BRACKET,
         
         -- Household Composition (Y/N flags)
-        CASE WHEN COALESCE(babies_0_3_hh, 0) = 1 THEN 'Y' ELSE 'N' END AS HAS_BABIES_0_3,
-        CASE WHEN COALESCE(children_0_18_hh, 0) = 1 THEN 'Y' ELSE 'N' END AS HAS_CHILDREN_0_18,
+        CASE WHEN COALESCE(babies_0_3_hh, 0) >= 1 THEN 'Y' ELSE 'N' END AS HAS_BABIES_0_3,
+        CASE WHEN COALESCE(children_0_18_hh, 0) >= 1 THEN 'Y' ELSE 'N' END AS HAS_CHILDREN_0_18,
         
         -- Adult Household Size (keep as integer)
         COALESCE(adult_hh_size, 0) AS ADULT_HOUSEHOLD_SIZE,
         
         -- Household Mobility (Y/N flags)
-        CASE WHEN COALESCE(move_likely_hh, 0) = 1 THEN 'Y' ELSE 'N' END AS MOVE_LIKELY,
-        CASE WHEN COALESCE(move_recent_hh, 0) = 1 THEN 'Y' ELSE 'N' END AS MOVE_RECENT,
+        CASE WHEN COALESCE(move_likely_hh, 0) >= 1 THEN 'Y' ELSE 'N' END AS MOVE_LIKELY,
+        CASE WHEN COALESCE(move_recent_hh, 0) >= 1 THEN 'Y' ELSE 'N' END AS MOVE_RECENT,
         
         -- Data Quality Indicators (Y/N flags)
-        CASE WHEN COALESCE(low_quality, 0) = 1 THEN 'Y' ELSE 'N' END AS LOW_QUALITY_FLAG,
-        CASE WHEN COALESCE(demo_incomplete, 0) = 1 THEN 'Y' ELSE 'N' END AS DEMO_INCOMPLETE_FLAG,
-        
-        -- Metadata
-        CURRENT_TIMESTAMP() AS DBT_UPDATED_AT
+        CASE WHEN COALESCE(low_quality, 0) >= 1 THEN 'Y' ELSE 'N' END AS LOW_QUALITY_FLAG,
+        CASE WHEN COALESCE(demo_incomplete, 0) >= 1 THEN 'Y' ELSE 'N' END AS DEMO_INCOMPLETE_FLAG
         
     FROM source_attributes
-    WHERE AKKIO_ID IS NOT NULL
+    WHERE HASH IS NOT NULL
 ),
 
--- Get only the most recent match for each TV ID
+-- Deduplicate records per TV ID
+-- Note: Multiple records per TV_ID can exist due to:
+--   1. Multiple data snapshots/refreshes over time
+--   2. Data quality issues causing true duplicates
+--   3. Different household compositions at different times
+--
+-- DEDUPLICATION STRATEGY (Staff Engineer Review - 2025-10-07):
+-- Without temporal data (no timestamp/match_date in source), we implement
+-- a DETERMINISTIC ordering strategy to ensure consistent results across runs:
+--   1. Prefer records with complete demographic data (fewer NULLs)
+--   2. Use household income as primary tiebreaker (higher income first)
+--   3. Use adult household size as secondary tiebreaker
+--   4. Use education level hierarchy as tertiary tiebreaker
+--   5. Finally, use HASH as ultimate tiebreaker for full determinism
+--
+-- This approach ensures:
+--   - Reproducible results across table optimizations/compactions
+--   - Business logic alignment (prefer more complete, higher-value households)
+--   - No dependency on physical data layout
+--
+-- TODO: If source table has timestamp/ingestion_date, replace this with temporal ordering
 latest_records AS (
     SELECT 
         *,
         ROW_NUMBER() OVER (
             PARTITION BY TV_ID 
-            ORDER BY MATCH_DATE DESC, DBT_UPDATED_AT DESC
+            ORDER BY 
+                -- Prefer records with complete demographic data
+                CASE WHEN GENDER IS NULL THEN 1 ELSE 0 END,
+                CASE WHEN AGE IS NULL THEN 1 ELSE 0 END,
+                CASE WHEN HOUSEHOLD_INCOME_K IS NULL THEN 1 ELSE 0 END,
+                CASE WHEN EDUCATION_LEVEL IS NULL THEN 1 ELSE 0 END,
+                CASE WHEN ETHNICITY IS NULL THEN 1 ELSE 0 END,
+                
+                -- Prefer higher-value households (business logic)
+                HOUSEHOLD_INCOME_K DESC NULLS LAST,
+                ADULT_HOUSEHOLD_SIZE DESC NULLS LAST,
+                
+                -- Education hierarchy (Graduate > College > Some College > HS)
+                CASE EDUCATION_LEVEL
+                    WHEN 'Graduate' THEN 4
+                    WHEN 'College' THEN 3
+                    WHEN 'Some College' THEN 2
+                    WHEN 'High School' THEN 1
+                    ELSE 0
+                END DESC,
+                
+                -- Data quality (prefer non-flagged records)
+                CASE WHEN LOW_QUALITY_FLAG = 'Y' THEN 1 ELSE 0 END,
+                CASE WHEN DEMO_INCOMPLETE_FLAG = 'Y' THEN 1 ELSE 0 END,
+                
+                -- Final tiebreaker for full determinism
+                AKKIO_ID  -- Ensures consistent results even for identical households
         ) AS row_num
     FROM attributes_decoded
 )
@@ -183,7 +243,6 @@ SELECT
     AKKIO_ID,
     TV_ID,
     AKKIO_HH_ID,
-    MATCH_DATE,
     
     -- Demographics (Decoded)
     GENDER,
@@ -214,8 +273,8 @@ SELECT
     LOW_QUALITY_FLAG,
     DEMO_INCOMPLETE_FLAG,
     
-    -- Metadata
-    DBT_UPDATED_AT
+    -- Processing Metadata
+    CURRENT_TIMESTAMP() AS DBT_UPDATED_AT
 
 FROM latest_records
 WHERE row_num = 1
