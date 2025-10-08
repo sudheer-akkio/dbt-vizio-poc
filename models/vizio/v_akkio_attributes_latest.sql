@@ -18,16 +18,9 @@
     Data Structure:
     - Source data contains HOUSEHOLD-LEVEL counts (not individual binary flags)
     - Example: demo_male_25_34 = 2 means there are 2 males aged 25-34 in household
-    - Multiple records per TV_ID may exist (different data snapshots/loads)
-    - Each TV_ID (hash) represents ONE household, not multiple individuals
-    
-    Deduplication Strategy (Production-Grade):
-    - Uses deterministic, business-logic-driven ordering to ensure:
-      1. Reproducible results across table optimizations/compactions
-      2. Preference for complete, high-quality demographic records
-      3. No dependency on physical data layout or query execution plan
-    - Ordering priority: completeness > income > household size > education > data quality > hash
-    - See latest_records CTE for full implementation details
+    - Each TV_ID (HASH) represents ONE unique household 
+    - Source data is already deduplicated at the HASH level
+    - No additional deduplication logic required
     
     Decoded Attributes:
     - Gender: Single column (Male/Female) - presence of any male/female in household
@@ -178,7 +171,11 @@ attributes_decoded AS (
         
     FROM source_attributes
     WHERE HASH IS NOT NULL
-),
+)
+
+-- Deduplication Note: 
+-- Source data already contains unique HASH values per household.
+-- No deduplication logic required since HASH is the primary key.
 
 -- Deduplicate records per TV ID
 -- Note: Multiple records per TV_ID can exist due to:
@@ -199,43 +196,45 @@ attributes_decoded AS (
 --   - Reproducible results across table optimizations/compactions
 --   - Business logic alignment (prefer more complete, higher-value households)
 --   - No dependency on physical data layout
+
+-- OLD DEDUP LOGIC
 --
 -- TODO: If source table has timestamp/ingestion_date, replace this with temporal ordering
-latest_records AS (
-    SELECT 
-        *,
-        ROW_NUMBER() OVER (
-            PARTITION BY TV_ID 
-            ORDER BY 
-                -- Prefer records with complete demographic data
-                CASE WHEN GENDER IS NULL THEN 1 ELSE 0 END,
-                CASE WHEN AGE IS NULL THEN 1 ELSE 0 END,
-                CASE WHEN HOUSEHOLD_INCOME_K IS NULL THEN 1 ELSE 0 END,
-                CASE WHEN EDUCATION_LEVEL IS NULL THEN 1 ELSE 0 END,
-                CASE WHEN ETHNICITY IS NULL THEN 1 ELSE 0 END,
+-- latest_records AS (
+--     SELECT 
+--         *,
+--         ROW_NUMBER() OVER (
+--             PARTITION BY TV_ID 
+--             ORDER BY 
+--                 -- Prefer records with complete demographic data
+--                 CASE WHEN GENDER IS NULL THEN 1 ELSE 0 END,
+--                 CASE WHEN AGE IS NULL THEN 1 ELSE 0 END,
+--                 CASE WHEN HOUSEHOLD_INCOME_K IS NULL THEN 1 ELSE 0 END,
+--                 CASE WHEN EDUCATION_LEVEL IS NULL THEN 1 ELSE 0 END,
+--                 CASE WHEN ETHNICITY IS NULL THEN 1 ELSE 0 END,
                 
-                -- Prefer higher-value households (business logic)
-                HOUSEHOLD_INCOME_K DESC NULLS LAST,
-                ADULT_HOUSEHOLD_SIZE DESC NULLS LAST,
+--                 -- Prefer higher-value households (business logic)
+--                 HOUSEHOLD_INCOME_K DESC NULLS LAST,
+--                 ADULT_HOUSEHOLD_SIZE DESC NULLS LAST,
                 
-                -- Education hierarchy (Graduate > College > Some College > HS)
-                CASE EDUCATION_LEVEL
-                    WHEN 'Graduate' THEN 4
-                    WHEN 'College' THEN 3
-                    WHEN 'Some College' THEN 2
-                    WHEN 'High School' THEN 1
-                    ELSE 0
-                END DESC,
+--                 -- Education hierarchy (Graduate > College > Some College > HS)
+--                 CASE EDUCATION_LEVEL
+--                     WHEN 'Graduate' THEN 4
+--                     WHEN 'College' THEN 3
+--                     WHEN 'Some College' THEN 2
+--                     WHEN 'High School' THEN 1
+--                     ELSE 0
+--                 END DESC,
                 
-                -- Data quality (prefer non-flagged records)
-                CASE WHEN LOW_QUALITY_FLAG = 'Y' THEN 1 ELSE 0 END,
-                CASE WHEN DEMO_INCOMPLETE_FLAG = 'Y' THEN 1 ELSE 0 END,
+--                 -- Data quality (prefer non-flagged records)
+--                 CASE WHEN LOW_QUALITY_FLAG = 'Y' THEN 1 ELSE 0 END,
+--                 CASE WHEN DEMO_INCOMPLETE_FLAG = 'Y' THEN 1 ELSE 0 END,
                 
-                -- Final tiebreaker for full determinism
-                AKKIO_ID  -- Ensures consistent results even for identical households
-        ) AS row_num
-    FROM attributes_decoded
-)
+--                 -- Final tiebreaker for full determinism
+--                 AKKIO_ID  -- Ensures consistent results even for identical households
+--         ) AS row_num
+--     FROM attributes_decoded
+-- )
 
 SELECT
     -- Keys and Temporal
@@ -276,5 +275,4 @@ SELECT
     -- Processing Metadata
     CURRENT_TIMESTAMP() AS DBT_UPDATED_AT
 
-FROM latest_records
-WHERE row_num = 1
+FROM attributes_decoded
