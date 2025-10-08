@@ -173,30 +173,6 @@ attributes_decoded AS (
     WHERE HASH IS NOT NULL
 )
 
--- Deduplication Note: 
--- Source data already contains unique HASH values per household.
--- No deduplication logic required since HASH is the primary key.
-
--- Deduplicate records per TV ID
--- Note: Multiple records per TV_ID can exist due to:
---   1. Multiple data snapshots/refreshes over time
---   2. Data quality issues causing true duplicates
---   3. Different household compositions at different times
---
--- DEDUPLICATION STRATEGY (Staff Engineer Review - 2025-10-07):
--- Without temporal data (no timestamp/match_date in source), we implement
--- a DETERMINISTIC ordering strategy to ensure consistent results across runs:
---   1. Prefer records with complete demographic data (fewer NULLs)
---   2. Use household income as primary tiebreaker (higher income first)
---   3. Use adult household size as secondary tiebreaker
---   4. Use education level hierarchy as tertiary tiebreaker
---   5. Finally, use HASH as ultimate tiebreaker for full determinism
---
--- This approach ensures:
---   - Reproducible results across table optimizations/compactions
---   - Business logic alignment (prefer more complete, higher-value households)
---   - No dependency on physical data layout
-
 -- OLD DEDUP LOGIC
 --
 -- TODO: If source table has timestamp/ingestion_date, replace this with temporal ordering
