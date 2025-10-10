@@ -65,8 +65,8 @@ SELECT
     -- Weight (fixed at 11 per requirements)
     11 AS WEIGHT,
     
-    -- Demographics
-    attr.GENDER,
+    -- Demographics (convert NULL to 'UNDETERMINED' to match Horizon schema for insights compatibility)
+    COALESCE(attr.GENDER, 'UNDETERMINED') AS GENDER,
     attr.AGE,
     attr.AGE_BUCKET,
     

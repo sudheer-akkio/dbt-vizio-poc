@@ -62,27 +62,29 @@ attributes_decoded AS (
             ELSE NULL
         END AS GENDER,
         
-        -- Decode Age (Median of age range bucket) - using standard buckets
+        -- Decode Age (lower bound of age range bucket - integer for insights compatibility)
         -- Note: Using >= 1 to handle count-based data (household composition)
-        CASE 
-            WHEN COALESCE(demo_male_18_24, 0) >= 1 OR COALESCE(demo_female_18_24, 0) >= 1 THEN 21
-            WHEN COALESCE(demo_male_25_34, 0) >= 1 OR COALESCE(demo_female_25_34, 0) >= 1 THEN 29.5
-            WHEN COALESCE(demo_male_35_44, 0) >= 1 OR COALESCE(demo_female_35_44, 0) >= 1 THEN 39.5
-            WHEN COALESCE(demo_male_45_54, 0) >= 1 OR COALESCE(demo_female_45_54, 0) >= 1 THEN 49.5
-            WHEN COALESCE(demo_male_55_64, 0) >= 1 OR COALESCE(demo_female_55_64, 0) >= 1 THEN 59.5
-            WHEN COALESCE(demo_male_65_999, 0) >= 1 OR COALESCE(demo_female_65_999, 0) >= 1 THEN 72.5
+        -- Insights expect integer ages, not decimals
+        CASE
+            WHEN COALESCE(demo_male_18_24, 0) >= 1 OR COALESCE(demo_female_18_24, 0) >= 1 THEN 18
+            WHEN COALESCE(demo_male_25_34, 0) >= 1 OR COALESCE(demo_female_25_34, 0) >= 1 THEN 25
+            WHEN COALESCE(demo_male_35_44, 0) >= 1 OR COALESCE(demo_female_35_44, 0) >= 1 THEN 35
+            WHEN COALESCE(demo_male_45_54, 0) >= 1 OR COALESCE(demo_female_45_54, 0) >= 1 THEN 45
+            WHEN COALESCE(demo_male_55_64, 0) >= 1 OR COALESCE(demo_female_55_64, 0) >= 1 THEN 55
+            WHEN COALESCE(demo_male_65_999, 0) >= 1 OR COALESCE(demo_female_65_999, 0) >= 1 THEN 65
             ELSE NULL
         END AS AGE,
         
-        -- Decode Age Bucket (keep as label for reference)
-        CASE 
-            WHEN COALESCE(demo_male_18_24, 0) >= 1 OR COALESCE(demo_female_18_24, 0) >= 1 THEN '18-24'
-            WHEN COALESCE(demo_male_25_34, 0) >= 1 OR COALESCE(demo_female_25_34, 0) >= 1 THEN '25-34'
-            WHEN COALESCE(demo_male_35_44, 0) >= 1 OR COALESCE(demo_female_35_44, 0) >= 1 THEN '35-44'
-            WHEN COALESCE(demo_male_45_54, 0) >= 1 OR COALESCE(demo_female_45_54, 0) >= 1 THEN '45-54'
-            WHEN COALESCE(demo_male_55_64, 0) >= 1 OR COALESCE(demo_female_55_64, 0) >= 1 THEN '55-64'
-            WHEN COALESCE(demo_male_65_999, 0) >= 1 OR COALESCE(demo_female_65_999, 0) >= 1 THEN '65+'
-            ELSE NULL
+        -- Age Bucket (encoded as integers to match Horizon schema for insights)
+        -- 1: 18-24, 2: 25-34, 3: 35-44, 4: 45-54, 5: 55-64, 6: 65-74, 7: 75+
+        CASE
+            WHEN COALESCE(demo_male_18_24, 0) >= 1 OR COALESCE(demo_female_18_24, 0) >= 1 THEN 1
+            WHEN COALESCE(demo_male_25_34, 0) >= 1 OR COALESCE(demo_female_25_34, 0) >= 1 THEN 2
+            WHEN COALESCE(demo_male_35_44, 0) >= 1 OR COALESCE(demo_female_35_44, 0) >= 1 THEN 3
+            WHEN COALESCE(demo_male_45_54, 0) >= 1 OR COALESCE(demo_female_45_54, 0) >= 1 THEN 4
+            WHEN COALESCE(demo_male_55_64, 0) >= 1 OR COALESCE(demo_female_55_64, 0) >= 1 THEN 5
+            WHEN COALESCE(demo_male_65_999, 0) >= 1 OR COALESCE(demo_female_65_999, 0) >= 1 THEN 6
+            ELSE 7
         END AS AGE_BUCKET,
         
         -- Decode Education Level (highest level indicated)
@@ -117,41 +119,44 @@ attributes_decoded AS (
             ELSE NULL
         END AS MARITAL_STATUS,
         
-        -- Home Ownership
-        CASE 
-            WHEN COALESCE(home_owner_hh, 0) >= 1 THEN 'Owner'
-            WHEN COALESCE(home_renter_hh, 0) >= 1 THEN 'Renter'
+        -- Home Ownership (numeric for insights compatibility: 1=Owner, 0=Renter, NULL=Unknown)
+        CASE
+            WHEN COALESCE(home_owner_hh, 0) >= 1 THEN 1
+            WHEN COALESCE(home_renter_hh, 0) >= 1 THEN 0
             ELSE NULL
         END AS HOME_OWNERSHIP,
         
-        -- Decode Household Income (Median of income range in thousands)
-        CASE 
-            WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN 17.5
-            WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN 40
-            WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN 50
-            WHEN COALESCE(income_55_70_hh, 0) >= 1 THEN 62.5
-            WHEN COALESCE(income_70_85_hh, 0) >= 1 THEN 77.5
-            WHEN COALESCE(income_85_100_hh, 0) >= 1 THEN 92.5
-            WHEN COALESCE(income_100_125_hh, 0) >= 1 THEN 112.5
-            WHEN COALESCE(income_125_150_hh, 0) >= 1 THEN 137.5
-            WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN 175
-            WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN 250
+        -- Decode Household Income (lower bound of income range in thousands - integer for insights compatibility)
+        -- Insights expect integer values for histogram min_bound/max_bound
+        CASE
+            WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN 0
+            WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN 35
+            WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN 45
+            WHEN COALESCE(income_55_70_hh, 0) >= 1 THEN 55
+            WHEN COALESCE(income_70_85_hh, 0) >= 1 THEN 70
+            WHEN COALESCE(income_85_100_hh, 0) >= 1 THEN 85
+            WHEN COALESCE(income_100_125_hh, 0) >= 1 THEN 100
+            WHEN COALESCE(income_125_150_hh, 0) >= 1 THEN 125
+            WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN 150
+            WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN 200
             ELSE NULL
         END AS HOUSEHOLD_INCOME_K,
         
-        -- Decode Income Bucket (categorical income groupings for histogram insights)
+        -- Income Bucket (encoded as integers to match Horizon schema for insights)
+        -- 1: $0-35K, 2: $35-45K, 3: $45-55K, 4: $55-70K, 5: $70-85K,
+        -- 6: $85-100K, 7: $100-125K, 8: $125-150K, 9: $150-200K, 10: $200K+
         CASE
-            WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN '$0-35K'
-            WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN '$35-45K'
-            WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN '$45-55K'
-            WHEN COALESCE(income_55_70_hh, 0) >= 1 THEN '$55-70K'
-            WHEN COALESCE(income_70_85_hh, 0) >= 1 THEN '$70-85K'
-            WHEN COALESCE(income_85_100_hh, 0) >= 1 THEN '$85-100K'
-            WHEN COALESCE(income_100_125_hh, 0) >= 1 THEN '$100-125K'
-            WHEN COALESCE(income_125_150_hh, 0) >= 1 THEN '$125-150K'
-            WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN '$150-200K'
-            WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN '$200K+'
-            ELSE NULL
+            WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN 1
+            WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN 2
+            WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN 3
+            WHEN COALESCE(income_55_70_hh, 0) >= 1 THEN 4
+            WHEN COALESCE(income_70_85_hh, 0) >= 1 THEN 5
+            WHEN COALESCE(income_85_100_hh, 0) >= 1 THEN 6
+            WHEN COALESCE(income_100_125_hh, 0) >= 1 THEN 7
+            WHEN COALESCE(income_125_150_hh, 0) >= 1 THEN 8
+            WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN 9
+            WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN 10
+            ELSE 11
         END AS INCOME_BUCKET,
         
         -- Household Composition (Y/N flags)
