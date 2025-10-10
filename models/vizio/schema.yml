@@ -647,8 +647,8 @@ models:
               min_value: 0
               max_value: 500
               severity: warn
-      - name: INCOME_BRACKET
-        description: Household income range label ($0-35K through $200K+) | :akkio-ml-ignore |<
+      - name: INCOME_BUCKET
+        description: Household income range bucket ($0-35K through $200K+) | :akkio-ml-ignore |<
       - name: HAS_BABIES_0_3
         description: Presence of babies aged 0-3 in household (Y/N)
       - name: HAS_CHILDREN_0_18
@@ -753,8 +753,8 @@ models:
               min_value: 0
               max_value: 500
               severity: warn
-      - name: INCOME_BRACKET
-        description: Household income range label ($0-35K through $200K+)
+      - name: INCOME_BUCKET
+        description: Household income range bucket ($0-35K through $200K+)
       - name: PARTITION_DATE
         description: partition_date derived from match_date | :akkio-context-ignore |<
         data_tests:

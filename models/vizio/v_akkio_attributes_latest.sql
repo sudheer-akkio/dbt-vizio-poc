@@ -139,8 +139,8 @@ attributes_decoded AS (
             ELSE NULL
         END AS HOUSEHOLD_INCOME_K,
         
-        -- Decode Income Bracket (keep as label for reference)
-        CASE 
+        -- Decode Income Bucket (categorical income groupings for histogram insights)
+        CASE
             WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN '$0-35K'
             WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN '$35-45K'
             WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN '$45-55K'
@@ -152,7 +152,7 @@ attributes_decoded AS (
             WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN '$150-200K'
             WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN '$200K+'
             ELSE NULL
-        END AS INCOME_BRACKET,
+        END AS INCOME_BUCKET,
         
         -- Household Composition (Y/N flags)
         CASE WHEN COALESCE(babies_0_3_hh, 0) >= 1 THEN 'Y' ELSE 'N' END AS HAS_BABIES_0_3,
@@ -233,7 +233,7 @@ SELECT
     
     -- Income (Decoded)
     HOUSEHOLD_INCOME_K,
-    INCOME_BRACKET,
+    INCOME_BUCKET,
     
     -- Household Composition
     HAS_BABIES_0_3,
