@@ -228,17 +228,27 @@ SELECT
     GENDER,
     AGE,
     AGE_BUCKET,
-    
+
+    -- Geographic Attributes (not available in Vizio data - required by audience service)
+    NULL AS STATE,
+    NULL AS ZIP11,
+    NULL AS COUNTY_NAME,
+
     -- Socioeconomic Attributes (Decoded)
     EDUCATION_LEVEL,
     ETHNICITY,
     SPANISH_LANGUAGE,
     MARITAL_STATUS,
     HOME_OWNERSHIP,
-    
+    HOME_OWNERSHIP AS HOMEOWNER,  -- Alias for audience queries
+
     -- Income (Decoded)
     HOUSEHOLD_INCOME_K,
+    HOUSEHOLD_INCOME_K AS INCOME,  -- Alias for audience queries
     INCOME_BUCKET,
+
+    -- Financial Attributes (not available in Vizio data - required by audience service)
+    NULL AS NET_WORTH,
     
     -- Household Composition
     HAS_BABIES_0_3,

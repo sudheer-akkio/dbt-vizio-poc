@@ -69,14 +69,21 @@ SELECT
     COALESCE(attr.GENDER, 'UNDETERMINED') AS GENDER,
     attr.AGE,
     attr.AGE_BUCKET,
-    
-    -- Contact identifiers
+    attr.ETHNICITY,
+    attr.EDUCATION_LEVEL,
+    attr.MARITAL_STATUS,
+
+    -- Household-level attributes (needed for audience queries - same as Horizon's V_AGG_BLU_IND)
+    attr.HOME_OWNERSHIP AS HOMEOWNER,
+    attr.HOUSEHOLD_INCOME_K AS INCOME,
+    attr.INCOME_BUCKET,
+
+    -- Contact identifiers (counts, not arrays, for insights compatibility)
     0 AS MAIDS,
-    -- ips.IPS_ARRAY AS IPS,
-    0 AS IPS,
+    COALESCE(SIZE(ips.IPS_ARRAY), 0) AS IPS,
     0 AS EMAILS,
     0 AS PHONES,
-    
+
     -- Temporal
     attr.PARTITION_DATE
 

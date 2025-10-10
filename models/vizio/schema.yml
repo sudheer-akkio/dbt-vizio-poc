@@ -709,6 +709,18 @@ models:
               severity: warn
       - name: AGE_BUCKET
         description: "Age range bucket code (1=18-24, 2=25-34, 3=35-44, 4=45-54, 5=55-64, 6=65-74, 7=75+)"
+      - name: ETHNICITY
+        description: Ethnicity classification (African American, Asian, White Non-Hispanic, Hispanic, Middle Eastern, Native American, Other, Unknown)
+      - name: EDUCATION_LEVEL
+        description: Highest education level attained (Graduate, College, Some College, High School)
+      - name: MARITAL_STATUS
+        description: Marital status (Married, Single)
+      - name: HOMEOWNER
+        description: "Home ownership status (1=Owner, 0=Renter, NULL=Unknown)"
+      - name: INCOME
+        description: "Household income in thousands (lower bound of income range: 0, 35, 45, 55, 70, 85, 100, 125, 150, 200)"
+      - name: INCOME_BUCKET
+        description: "Income range bucket code (1=$0-35K, 2=$35-45K, 3=$45-55K, 4=$55-70K, 5=$70-85K, 6=$85-100K, 7=$100-125K, 8=$125-150K, 9=$150-200K, 10=$200K+, 11=Unknown)"
       - name: MAIDS
         description: Mobile Advertising IDs associated with individual (placeholder for future enrichment)
       - name: IPS
