@@ -50,15 +50,15 @@ attributes_decoded AS (
         -- Temporal
         CURRENT_DATE() AS PARTITION_DATE,
         
-        -- Decode Gender (Male/Female based on which demo columns are populated)
+        -- Decode Gender (M/F based on which demo columns are populated - single letter for insights compatibility)
         -- Note: Using >= 1 to handle count-based data (household composition)
-        CASE 
-            WHEN COALESCE(demo_male_18_24, 0) + COALESCE(demo_male_25_34, 0) + COALESCE(demo_male_35_44, 0) + 
-                 COALESCE(demo_male_45_54, 0) + COALESCE(demo_male_55_64, 0) + COALESCE(demo_male_65_999, 0) > 0 
-            THEN 'Male'
-            WHEN COALESCE(demo_female_18_24, 0) + COALESCE(demo_female_25_34, 0) + COALESCE(demo_female_35_44, 0) + 
-                 COALESCE(demo_female_45_54, 0) + COALESCE(demo_female_55_64, 0) + COALESCE(demo_female_65_999, 0) > 0 
-            THEN 'Female'
+        CASE
+            WHEN COALESCE(demo_male_18_24, 0) + COALESCE(demo_male_25_34, 0) + COALESCE(demo_male_35_44, 0) +
+                 COALESCE(demo_male_45_54, 0) + COALESCE(demo_male_55_64, 0) + COALESCE(demo_male_65_999, 0) > 0
+            THEN 'M'
+            WHEN COALESCE(demo_female_18_24, 0) + COALESCE(demo_female_25_34, 0) + COALESCE(demo_female_35_44, 0) +
+                 COALESCE(demo_female_45_54, 0) + COALESCE(demo_female_55_64, 0) + COALESCE(demo_female_65_999, 0) > 0
+            THEN 'F'
             ELSE NULL
         END AS GENDER,
         
@@ -230,9 +230,9 @@ SELECT
     AGE_BUCKET,
 
     -- Geographic Attributes (not available in Vizio data - required by audience service)
-    NULL AS STATE,
-    NULL AS ZIP11,
-    NULL AS COUNTY_NAME,
+    CAST(NULL AS STRING) AS STATE,
+    CAST(NULL AS STRING) AS ZIP11,
+    CAST(NULL AS STRING) AS COUNTY_NAME,
 
     -- Socioeconomic Attributes (Decoded)
     EDUCATION_LEVEL,
@@ -248,7 +248,7 @@ SELECT
     INCOME_BUCKET,
 
     -- Financial Attributes (not available in Vizio data - required by audience service)
-    NULL AS NET_WORTH,
+    CAST(NULL AS BIGINT) AS NET_WORTH,
     
     -- Household Composition
     HAS_BABIES_0_3,
