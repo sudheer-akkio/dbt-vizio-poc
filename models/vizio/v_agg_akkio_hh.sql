@@ -28,7 +28,7 @@ SELECT
     
     -- Household Income
     HOUSEHOLD_INCOME_K AS INCOME,
-    INCOME_BRACKET,
+    INCOME_BUCKET,
     
     -- Temporal
     PARTITION_DATE
