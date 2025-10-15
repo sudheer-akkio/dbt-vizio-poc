@@ -40,6 +40,19 @@ WITH source_attributes AS (
     SELECT * FROM {{ source('vizio_poc_share', 'mk_akkio_experian_demo') }}
 ),
 
+-- Get most recent location data from ipage table (city, state, dma, zip)
+latest_location AS (
+    SELECT
+        hash,
+        city,
+        iso_state AS state,
+        dma,
+        zipcode AS zip_code
+    FROM {{ source('vizio_poc_share', 'production_r2081_ipage') }}
+    WHERE hash IS NOT NULL
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY hash ORDER BY date_partition DESC) = 1
+),
+
 attributes_decoded AS (
     SELECT
         -- Primary Keys (all reference same ID for optimization)
@@ -50,39 +63,41 @@ attributes_decoded AS (
         -- Temporal
         CURRENT_DATE() AS PARTITION_DATE,
         
-        -- Decode Gender (Male/Female based on which demo columns are populated)
+        -- Decode Gender (M/F based on which demo columns are populated - single letter for insights compatibility)
         -- Note: Using >= 1 to handle count-based data (household composition)
-        CASE 
-            WHEN COALESCE(demo_male_18_24, 0) + COALESCE(demo_male_25_34, 0) + COALESCE(demo_male_35_44, 0) + 
-                 COALESCE(demo_male_45_54, 0) + COALESCE(demo_male_55_64, 0) + COALESCE(demo_male_65_999, 0) > 0 
-            THEN 'Male'
-            WHEN COALESCE(demo_female_18_24, 0) + COALESCE(demo_female_25_34, 0) + COALESCE(demo_female_35_44, 0) + 
-                 COALESCE(demo_female_45_54, 0) + COALESCE(demo_female_55_64, 0) + COALESCE(demo_female_65_999, 0) > 0 
-            THEN 'Female'
+        CASE
+            WHEN COALESCE(demo_male_18_24, 0) + COALESCE(demo_male_25_34, 0) + COALESCE(demo_male_35_44, 0) +
+                 COALESCE(demo_male_45_54, 0) + COALESCE(demo_male_55_64, 0) + COALESCE(demo_male_65_999, 0) > 0
+            THEN 'M'
+            WHEN COALESCE(demo_female_18_24, 0) + COALESCE(demo_female_25_34, 0) + COALESCE(demo_female_35_44, 0) +
+                 COALESCE(demo_female_45_54, 0) + COALESCE(demo_female_55_64, 0) + COALESCE(demo_female_65_999, 0) > 0
+            THEN 'F'
             ELSE NULL
         END AS GENDER,
         
-        -- Decode Age (Median of age range bucket) - using standard buckets
+        -- Decode Age (lower bound of age range bucket - integer for insights compatibility)
         -- Note: Using >= 1 to handle count-based data (household composition)
-        CASE 
-            WHEN COALESCE(demo_male_18_24, 0) >= 1 OR COALESCE(demo_female_18_24, 0) >= 1 THEN 21
-            WHEN COALESCE(demo_male_25_34, 0) >= 1 OR COALESCE(demo_female_25_34, 0) >= 1 THEN 29.5
-            WHEN COALESCE(demo_male_35_44, 0) >= 1 OR COALESCE(demo_female_35_44, 0) >= 1 THEN 39.5
-            WHEN COALESCE(demo_male_45_54, 0) >= 1 OR COALESCE(demo_female_45_54, 0) >= 1 THEN 49.5
-            WHEN COALESCE(demo_male_55_64, 0) >= 1 OR COALESCE(demo_female_55_64, 0) >= 1 THEN 59.5
-            WHEN COALESCE(demo_male_65_999, 0) >= 1 OR COALESCE(demo_female_65_999, 0) >= 1 THEN 72.5
+        -- Insights expect integer ages, not decimals
+        CASE
+            WHEN COALESCE(demo_male_18_24, 0) >= 1 OR COALESCE(demo_female_18_24, 0) >= 1 THEN 18
+            WHEN COALESCE(demo_male_25_34, 0) >= 1 OR COALESCE(demo_female_25_34, 0) >= 1 THEN 25
+            WHEN COALESCE(demo_male_35_44, 0) >= 1 OR COALESCE(demo_female_35_44, 0) >= 1 THEN 35
+            WHEN COALESCE(demo_male_45_54, 0) >= 1 OR COALESCE(demo_female_45_54, 0) >= 1 THEN 45
+            WHEN COALESCE(demo_male_55_64, 0) >= 1 OR COALESCE(demo_female_55_64, 0) >= 1 THEN 55
+            WHEN COALESCE(demo_male_65_999, 0) >= 1 OR COALESCE(demo_female_65_999, 0) >= 1 THEN 65
             ELSE NULL
         END AS AGE,
         
-        -- Decode Age Bucket (keep as label for reference)
-        CASE 
-            WHEN COALESCE(demo_male_18_24, 0) >= 1 OR COALESCE(demo_female_18_24, 0) >= 1 THEN '18-24'
-            WHEN COALESCE(demo_male_25_34, 0) >= 1 OR COALESCE(demo_female_25_34, 0) >= 1 THEN '25-34'
-            WHEN COALESCE(demo_male_35_44, 0) >= 1 OR COALESCE(demo_female_35_44, 0) >= 1 THEN '35-44'
-            WHEN COALESCE(demo_male_45_54, 0) >= 1 OR COALESCE(demo_female_45_54, 0) >= 1 THEN '45-54'
-            WHEN COALESCE(demo_male_55_64, 0) >= 1 OR COALESCE(demo_female_55_64, 0) >= 1 THEN '55-64'
-            WHEN COALESCE(demo_male_65_999, 0) >= 1 OR COALESCE(demo_female_65_999, 0) >= 1 THEN '65+'
-            ELSE NULL
+        -- Age Bucket (encoded as integers to match Horizon schema for insights)
+        -- 1: 18-24, 2: 25-34, 3: 35-44, 4: 45-54, 5: 55-64, 6: 65-74, 7: 75+
+        CASE
+            WHEN COALESCE(demo_male_18_24, 0) >= 1 OR COALESCE(demo_female_18_24, 0) >= 1 THEN 1
+            WHEN COALESCE(demo_male_25_34, 0) >= 1 OR COALESCE(demo_female_25_34, 0) >= 1 THEN 2
+            WHEN COALESCE(demo_male_35_44, 0) >= 1 OR COALESCE(demo_female_35_44, 0) >= 1 THEN 3
+            WHEN COALESCE(demo_male_45_54, 0) >= 1 OR COALESCE(demo_female_45_54, 0) >= 1 THEN 4
+            WHEN COALESCE(demo_male_55_64, 0) >= 1 OR COALESCE(demo_female_55_64, 0) >= 1 THEN 5
+            WHEN COALESCE(demo_male_65_999, 0) >= 1 OR COALESCE(demo_female_65_999, 0) >= 1 THEN 6
+            ELSE 7
         END AS AGE_BUCKET,
         
         -- Decode Education Level (highest level indicated)
@@ -117,42 +132,45 @@ attributes_decoded AS (
             ELSE NULL
         END AS MARITAL_STATUS,
         
-        -- Home Ownership
-        CASE 
-            WHEN COALESCE(home_owner_hh, 0) >= 1 THEN 'Owner'
-            WHEN COALESCE(home_renter_hh, 0) >= 1 THEN 'Renter'
+        -- Home Ownership (numeric for insights compatibility: 1=Owner, 0=Renter, NULL=Unknown)
+        CASE
+            WHEN COALESCE(home_owner_hh, 0) >= 1 THEN 1
+            WHEN COALESCE(home_renter_hh, 0) >= 1 THEN 0
             ELSE NULL
         END AS HOME_OWNERSHIP,
         
-        -- Decode Household Income (Median of income range in thousands)
-        CASE 
-            WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN 17.5
-            WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN 40
-            WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN 50
-            WHEN COALESCE(income_55_70_hh, 0) >= 1 THEN 62.5
-            WHEN COALESCE(income_70_85_hh, 0) >= 1 THEN 77.5
-            WHEN COALESCE(income_85_100_hh, 0) >= 1 THEN 92.5
-            WHEN COALESCE(income_100_125_hh, 0) >= 1 THEN 112.5
-            WHEN COALESCE(income_125_150_hh, 0) >= 1 THEN 137.5
-            WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN 175
-            WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN 250
+        -- Decode Household Income (lower bound of income range in thousands - integer for insights compatibility)
+        -- Insights expect integer values for histogram min_bound/max_bound
+        CASE
+            WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN 0
+            WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN 35
+            WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN 45
+            WHEN COALESCE(income_55_70_hh, 0) >= 1 THEN 55
+            WHEN COALESCE(income_70_85_hh, 0) >= 1 THEN 70
+            WHEN COALESCE(income_85_100_hh, 0) >= 1 THEN 85
+            WHEN COALESCE(income_100_125_hh, 0) >= 1 THEN 100
+            WHEN COALESCE(income_125_150_hh, 0) >= 1 THEN 125
+            WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN 150
+            WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN 200
             ELSE NULL
         END AS HOUSEHOLD_INCOME_K,
         
-        -- Decode Income Bracket (keep as label for reference)
-        CASE 
-            WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN '$0-35K'
-            WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN '$35-45K'
-            WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN '$45-55K'
-            WHEN COALESCE(income_55_70_hh, 0) >= 1 THEN '$55-70K'
-            WHEN COALESCE(income_70_85_hh, 0) >= 1 THEN '$70-85K'
-            WHEN COALESCE(income_85_100_hh, 0) >= 1 THEN '$85-100K'
-            WHEN COALESCE(income_100_125_hh, 0) >= 1 THEN '$100-125K'
-            WHEN COALESCE(income_125_150_hh, 0) >= 1 THEN '$125-150K'
-            WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN '$150-200K'
-            WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN '$200K+'
-            ELSE NULL
-        END AS INCOME_BRACKET,
+        -- Income Bucket (encoded as integers to match Horizon schema for insights)
+        -- 1: $0-35K, 2: $35-45K, 3: $45-55K, 4: $55-70K, 5: $70-85K,
+        -- 6: $85-100K, 7: $100-125K, 8: $125-150K, 9: $150-200K, 10: $200K+
+        CASE
+            WHEN COALESCE(income_0_35_hh, 0) >= 1 THEN 1
+            WHEN COALESCE(income_35_45_hh, 0) >= 1 THEN 2
+            WHEN COALESCE(income_45_55_hh, 0) >= 1 THEN 3
+            WHEN COALESCE(income_55_70_hh, 0) >= 1 THEN 4
+            WHEN COALESCE(income_70_85_hh, 0) >= 1 THEN 5
+            WHEN COALESCE(income_85_100_hh, 0) >= 1 THEN 6
+            WHEN COALESCE(income_100_125_hh, 0) >= 1 THEN 7
+            WHEN COALESCE(income_125_150_hh, 0) >= 1 THEN 8
+            WHEN COALESCE(income_150_200_hh, 0) >= 1 THEN 9
+            WHEN COALESCE(income_200_plus_hh, 0) >= 1 THEN 10
+            ELSE 11
+        END AS INCOME_BUCKET,
         
         -- Household Composition (Y/N flags)
         CASE WHEN COALESCE(babies_0_3_hh, 0) >= 1 THEN 'Y' ELSE 'N' END AS HAS_BABIES_0_3,
@@ -171,6 +189,18 @@ attributes_decoded AS (
         
     FROM source_attributes
     WHERE HASH IS NOT NULL
+),
+
+-- Join location data with decoded attributes
+attributes_with_location AS (
+    SELECT
+        a.*,
+        l.city,
+        l.state,
+        l.dma,
+        l.zip_code
+    FROM attributes_decoded a
+    LEFT JOIN latest_location l ON a.AKKIO_ID = l.hash
 )
 
 -- OLD DEDUP LOGIC
@@ -218,22 +248,34 @@ SELECT
     AKKIO_ID,
     TV_ID,
     AKKIO_HH_ID,
-    
+
     -- Demographics (Decoded)
     GENDER,
     AGE,
     AGE_BUCKET,
-    
+
+    -- Geographic Attributes (from ipage table)
+    state AS STATE,
+    LPAD(CAST(zip_code AS STRING), 11, '0') AS ZIP11,
+    CAST(NULL AS STRING) AS COUNTY_NAME,  -- County not available in ipage
+    city AS CITY,
+    dma AS DMA_NAME,
+
     -- Socioeconomic Attributes (Decoded)
     EDUCATION_LEVEL,
     ETHNICITY,
     SPANISH_LANGUAGE,
     MARITAL_STATUS,
     HOME_OWNERSHIP,
-    
+    HOME_OWNERSHIP AS HOMEOWNER,  -- Alias for audience queries
+
     -- Income (Decoded)
     HOUSEHOLD_INCOME_K,
-    INCOME_BRACKET,
+    HOUSEHOLD_INCOME_K AS INCOME,  -- Alias for audience queries
+    INCOME_BUCKET,
+
+    -- Financial Attributes (not available in Vizio data - required by audience service)
+    CAST(NULL AS BIGINT) AS NET_WORTH,
     
     -- Household Composition
     HAS_BABIES_0_3,
@@ -251,4 +293,4 @@ SELECT
     -- Processing Metadata
     CURRENT_TIMESTAMP() AS DBT_UPDATED_AT
 
-FROM attributes_decoded
+FROM attributes_with_location

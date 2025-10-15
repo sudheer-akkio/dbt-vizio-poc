@@ -160,7 +160,7 @@ models:
       - name: AIR_DATE
         description: Original air date of the content
       - name: SESSION_TYPE
-        description: Live or DVR viewing session indicator
+        description: Viewing session type indicator
         data_tests:
           - accepted_values:
               values: ['Live', 'DVR', 'live', 'dvr']
@@ -349,7 +349,7 @@ models:
       - name: NEXT_NETWORK
         description: Network affiliate for next content | :lower :space-to-hyphen
       - name: SESSION_TYPE
-        description: Live or DVR viewing session indicator
+        description: Viewing session type indicator
       - name: INPUT_CATEGORY
         description: Category of the input device generating the data | :lower :space-to-hyphen
       - name: INPUT_DEVICE_NAME
@@ -465,7 +465,7 @@ models:
       - name: CITY
         description: City where TV was active
       - name: STATE_CODE
-        description: State code where TV was active (ISO format)
+        description: State code where TV was active
       - name: DMA
         description: Designated Market Area code of the device location
       - name: ZIP_CODE
@@ -521,7 +521,7 @@ models:
       - name: CHANNEL_AFFILIATE
         description: Network affiliate where impression occurred | :lower :space-to-hyphen
       - name: LOCAL_OR_NATIONAL
-        description: Indicates if impression was on local or national broadcast
+        description: Local or national broadcast indicator
       - name: SESSION_TYPE
         description: Type of viewing session (Live, DVR, etc.)
       - name: SESSION_SOURCE
@@ -583,7 +583,7 @@ models:
       - name: CHANNEL_AFFILIATE
         description: Network affiliate where impression occurred | :lower :space-to-hyphen
       - name: LOCAL_OR_NATIONAL
-        description: Indicates if impression was on local or national broadcast
+        description: Local or national broadcast indicator
       - name: SESSION_TYPE
         description: Type of viewing session (Live, DVR, etc.)
       - name: SESSION_SOURCE
@@ -620,39 +620,39 @@ models:
           - not_null
           - unique
       - name: GENDER
-        description: Gender of primary viewer (Male/Female) | :ml-encoding-nominal |<
+        description: Gender of primary viewer | :ml-encoding-nominal |<
       - name: AGE
-        description: Age of primary viewer (median of age range bucket)
+        description: Age of primary viewer (lower bound of age range bucket)
         data_tests:
           - dbt_utils.accepted_range:
               min_value: 18
               max_value: 100
               severity: warn
       - name: AGE_BUCKET
-        description: Age range bucket label (18-24, 25-34, 35-44, 45-54, 55-64, 65+) | :akkio-ml-ignore |<
+        description: Age range bucket code | :akkio-ml-ignore |<
       - name: EDUCATION_LEVEL
-        description: Highest education level attained (Graduate, College, Some College, High School) 
+        description: Highest education level attained 
       - name: ETHNICITY
-        description: Ethnicity classification (African American, Asian, White Non-Hispanic, Hispanic, Middle Eastern, Native American, Other, Unknown) | :ml-encoding-nominal |<
+        description: Ethnicity classification | :ml-encoding-nominal |<
       - name: SPANISH_LANGUAGE
-        description: Spanish language preference indicator (Y/N)
+        description: Spanish language preference indicator
       - name: MARITAL_STATUS
-        description: Marital status (Married, Single)
+        description: Marital status
       - name: HOME_OWNERSHIP
-        description: Home ownership status (Owner, Renter)
+        description: Home ownership status
       - name: HOUSEHOLD_INCOME_K
-        description: Household income in thousands (median of income range bucket)
+        description: Household income in thousands (lower bound of income range)
         data_tests:
           - dbt_utils.accepted_range:
               min_value: 0
               max_value: 500
               severity: warn
-      - name: INCOME_BRACKET
-        description: Household income range label ($0-35K through $200K+) | :akkio-ml-ignore |<
+      - name: INCOME_BUCKET
+        description: Income range bucket code | :akkio-ml-ignore |<
       - name: HAS_BABIES_0_3
-        description: Presence of babies aged 0-3 in household (Y/N)
+        description: Presence of babies aged 0-3 in household
       - name: HAS_CHILDREN_0_18
-        description: Presence of children aged 0-18 in household (Y/N)
+        description: Presence of children aged 0-18 in household
       - name: ADULT_HOUSEHOLD_SIZE
         description: Number of adults in household
         data_tests:
@@ -661,13 +661,13 @@ models:
               max_value: 20
               severity: warn
       - name: MOVE_LIKELY
-        description: Likelihood of household moving soon (Y/N)
+        description: Likelihood of household moving soon
       - name: MOVE_RECENT
-        description: Recent move indicator (Y/N)
+        description: Recent move indicator
       - name: LOW_QUALITY_FLAG
-        description: Data quality flag indicating low quality match (Y/N)
+        description: Data quality flag indicating low quality match
       - name: DEMO_INCOMPLETE_FLAG
-        description: Demographic data incomplete indicator (Y/N)
+        description: Demographic data incomplete indicator
       - name: DBT_UPDATED_AT
         description: Timestamp when record was processed by dbt | :akkio-ml-ignore |<
 
@@ -699,16 +699,28 @@ models:
           - dbt_utils.accepted_values:
               values: [11]
       - name: GENDER
-        description: Gender of primary viewer (Male/Female)
+        description: Gender of primary viewer
       - name: AGE
-        description: Age of primary viewer (median of age range bucket)
+        description: Age of primary viewer (lower bound of age range bucket)
         data_tests:
           - dbt_utils.accepted_range:
               min_value: 18
               max_value: 100
               severity: warn
       - name: AGE_BUCKET
-        description: Age range bucket label (18-24, 25-34, 35-44, 45-54, 55-64, 65+)
+        description: Age range bucket code
+      - name: ETHNICITY
+        description: Ethnicity classification
+      - name: EDUCATION_LEVEL
+        description: Highest education level attained
+      - name: MARITAL_STATUS
+        description: Marital status
+      - name: HOMEOWNER
+        description: Home ownership status
+      - name: INCOME
+        description: Household income in thousands (lower bound of income range)
+      - name: INCOME_BUCKET
+        description: Income range bucket code
       - name: MAIDS
         description: Mobile Advertising IDs associated with individual (placeholder for future enrichment)
       - name: IPS
@@ -745,16 +757,16 @@ models:
           - dbt_utils.accepted_values:
               values: [11]
       - name: HOMEOWNER
-        description: Home ownership status (Owner, Renter)
+        description: Home ownership status
       - name: INCOME
-        description: Household income in thousands (median of income range bucket)
+        description: Household income in thousands (lower bound of income range)
         data_tests:
           - dbt_utils.accepted_range:
               min_value: 0
               max_value: 500
               severity: warn
-      - name: INCOME_BRACKET
-        description: Household income range label ($0-35K through $200K+)
+      - name: INCOME_BUCKET
+        description: Income range bucket code
       - name: PARTITION_DATE
         description: partition_date derived from match_date | :akkio-context-ignore |<
         data_tests:
