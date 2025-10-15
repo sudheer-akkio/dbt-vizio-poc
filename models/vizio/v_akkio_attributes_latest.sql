@@ -40,6 +40,19 @@ WITH source_attributes AS (
     SELECT * FROM {{ source('vizio_poc_share', 'mk_akkio_experian_demo') }}
 ),
 
+-- Get most recent location data from ipage table (city, state, dma, zip)
+latest_location AS (
+    SELECT
+        hash,
+        city,
+        iso_state AS state,
+        dma,
+        zipcode AS zip_code
+    FROM {{ source('vizio_poc_share', 'production_r2081_ipage') }}
+    WHERE hash IS NOT NULL
+    QUALIFY ROW_NUMBER() OVER (PARTITION BY hash ORDER BY date_partition DESC) = 1
+),
+
 attributes_decoded AS (
     SELECT
         -- Primary Keys (all reference same ID for optimization)
@@ -176,6 +189,18 @@ attributes_decoded AS (
         
     FROM source_attributes
     WHERE HASH IS NOT NULL
+),
+
+-- Join location data with decoded attributes
+attributes_with_location AS (
+    SELECT
+        a.*,
+        l.city,
+        l.state,
+        l.dma,
+        l.zip_code
+    FROM attributes_decoded a
+    LEFT JOIN latest_location l ON a.AKKIO_ID = l.hash
 )
 
 -- OLD DEDUP LOGIC
@@ -223,16 +248,18 @@ SELECT
     AKKIO_ID,
     TV_ID,
     AKKIO_HH_ID,
-    
+
     -- Demographics (Decoded)
     GENDER,
     AGE,
     AGE_BUCKET,
 
-    -- Geographic Attributes (not available in Vizio data - required by audience service)
-    CAST(NULL AS STRING) AS STATE,
-    CAST(NULL AS STRING) AS ZIP11,
-    CAST(NULL AS STRING) AS COUNTY_NAME,
+    -- Geographic Attributes (from ipage table)
+    state AS STATE,
+    LPAD(CAST(zip_code AS STRING), 11, '0') AS ZIP11,
+    CAST(NULL AS STRING) AS COUNTY_NAME,  -- County not available in ipage
+    city AS CITY,
+    dma AS DMA_NAME,
 
     -- Socioeconomic Attributes (Decoded)
     EDUCATION_LEVEL,
@@ -266,4 +293,4 @@ SELECT
     -- Processing Metadata
     CURRENT_TIMESTAMP() AS DBT_UPDATED_AT
 
-FROM attributes_decoded
+FROM attributes_with_location
