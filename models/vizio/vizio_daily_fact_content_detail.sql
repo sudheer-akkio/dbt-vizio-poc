@@ -1,7 +1,7 @@
 {{ config(
     materialized='table',
     post_hook=[    
-        "alter table {{this}} cluster by (partition_date, tv_id)", 
+        "alter table {{this}} cluster by (viewed_date, tv_id)", 
     ]
 )}}
 

@@ -1,4 +1,4 @@
-{{ config(
+{{ config(    
     materialized='incremental',
     unique_key=['PARTITION_DATE', 'TV_ID'],
     incremental_strategy='merge',
