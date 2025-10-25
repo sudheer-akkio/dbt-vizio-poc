@@ -22,9 +22,6 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "target"
   - "dbt_packages"
 
-#vars:
-#  table_prefix: "{{ env_var('DBT_TBL_PREFIX') }}" # define a table prefix to use for tables to be created
-
 flags:
   use_materialization_v2: true
 
@@ -46,7 +43,7 @@ models:
     vizio:
       +tags: 
         - vizio
-      +database: akkio_poc
+      +database: akkio      
       # Databricks optimizations for large-scale processing
       # +file_format: delta
       # +on_schema_change: 'sync_all_columns'

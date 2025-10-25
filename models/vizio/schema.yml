@@ -47,67 +47,38 @@ models:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
             - PARTITION_DATE
-            - TV_ID
+            - AKKIO_ID
     columns:
       - name: PARTITION_DATE
         description: partition_date | :akkio-context-ignore |
-        data_tests:
-          - not_null
-          - relationships:
-              to: ref('vizio_daily_fact_content_detail')
-              field: PARTITION_DATE
-              severity: warn
       - name: VIEWED_DATE
         description: date content was viewed
         data_tests:
           - not_null
-      - name: TV_ID
-        description: Device ID hash for the TV Device
-        data_tests:
-          - not_null
-          - relationships:
-              to: ref('vizio_daily_fact_content_detail')
-              field: TV_ID
-              severity: warn
       - name: AKKIO_ID
         description: Primary device identifier from Akkio (optimized - same value as TV_ID)
         data_tests:
           - not_null
-          - unique
       - name: TIMEZONE
         description: Timezone of the TV device for local time conversion
-      - name: ZIP_CODE_ARRAY
-        description: List of possible Zip Code locations of Household where TV was used
-      - name: DMA_ARRAY
-        description: List of Designated Market Area codes where TV was used
-      - name: NETWORK_ARRAY
-        description: List of Networks viewed | :lower :space-to-hyphen :str-list-col-pregen
-      - name: CALLSIGN_ARRAY
-        description: List of Networks callsigns viewed | :lower :space-to-hyphen :str-list-col-pregen
-      - name: TITLE_ARRAY
-        description: List of Content titles watched | :lower :space-to-hyphen :str-list-col-pregen
-      - name: GENRE_ARRAY
-        description: List of content Genre watched | :lower :space-to-hyphen :str-list-col-pregen
-      - name: INPUT_CATEGORY_ARRAY
-        description: List of input device categories used to watch content | :lower :space-to-hyphen :str-list-col-pregen
-      - name: INPUT_DEVICE_ARRAY
-        description: List of input devices used to watch content | :lower :space-to-hyphen :str-list-col-pregen
-      - name: APP_SERVICE_ARRAY
-        description: List of app services used to watch content | :lower :space-to-hyphen :str-list-col-pregen
+      - name: ZIP_CODE
+        description: Zip Code locations of Household where TV was used
+      - name: DMA
+        description: Designated Market Area codes where TV was used
       - name: NETWORK_STR_LIST
-        description: List of Networks viewed | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of Networks viewed | :lower :space-to-hyphen :csv
       - name: CALLSIGN_STR_LIST
-        description: List of Networks callsigns viewed | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of Networks callsigns viewed | :lower :space-to-hyphen :csv
       - name: TITLE_STR_LIST
-        description: List of Content titles watched | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of Content titles watched | :lower :space-to-hyphen :csv
       - name: GENRE_STR_LIST
-        description: List of content Genre watched | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of content Genre watched | :lower :space-to-hyphen :csv
       - name: INPUT_CATEGORY_STR_LIST
-        description: List of input device categories used | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of input device categories used | :upper :space-to-hyphen :csv
       - name: INPUT_DEVICE_STR_LIST
-        description: List of input devices used to watch content | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of input devices used to watch content | :lower :space-to-underscore :csv
       - name: APP_SERVICE_STR_LIST
-        description: List of app services used to watch content | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of app services used to watch content | :lower :space-to-hyphen :csv
       - name: TOTAL_VIEWING_SECONDS
         description: Total seconds of content viewed during the day
         data_tests:
@@ -130,17 +101,10 @@ models:
         description: date content was viewed
         data_tests:
           - not_null
-      - name: TV_ID
-        description: Device ID hash for the TV Device
-        data_tests:
-          - not_null
       - name: AKKIO_ID
         description: Primary device identifier from Akkio (optimized - same value as TV_ID)
         data_tests:
           - not_null
-          - unique
-      - name: HASHED_IP
-        description: sha1 hash of IPv4 Address postfixed with salt
       - name: ZIP_CODE
         description: Zip Code of Household where TV was last used
       - name: DMA
@@ -156,15 +120,11 @@ models:
       - name: TITLE
         description: Title of the show or movie name | :lower :space-to-hyphen
       - name: GENRE
-        description: Semicolon separated list of Genres of the show/movie | :lower :space-to-hyphen
+        description: Comma separated list of Genres of the show/movie | :lower :space-to-hyphen :csv :all-unique-values
       - name: AIR_DATE
         description: Original air date of the content
-      - name: SESSION_TYPE
-        description: Viewing session type indicator
-        data_tests:
-          - accepted_values:
-              values: ['Live', 'DVR', 'live', 'dvr']
-              severity: warn
+      - name: WATCHED_LIVE
+        description: If content was watched live
       - name: SESSION_START_TIME_UTC
         description: Actual start time in UTC when device started watching this content
         data_tests:
@@ -180,9 +140,9 @@ models:
           - dbt_utils.expression_is_true:
               expression: ">= 0"
       - name: INPUT_CATEGORY
-        description: Category of the input device generating the data | :lower :space-to-hyphen
+        description: Category of the input device generating the data | :upper :space-to-hyphen
       - name: INPUT_DEVICE_NAME
-        description: Name of the input device generating the data | :lower :space-to-hyphen
+        description: Name of the input device generating the data | :lower :space-to-underscore
       - name: APP_SERVICE
         description: Application or service used for content viewing | :lower :space-to-hyphen
 
@@ -195,7 +155,7 @@ models:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
             - PARTITION_DATE
-            - TV_ID
+            - AKKIO_ID
     columns:
       - name: PARTITION_DATE
         description: partition_date | :akkio-context-ignore |
@@ -203,60 +163,26 @@ models:
           - not_null
       - name: VIEWED_DATE
         description: date commercial was viewed
-        data_tests:
-          - not_null
-      - name: TV_ID
-        description: Device ID hash for the TV Device
-        data_tests:
-          - not_null
       - name: TIMEZONE
         description: Timezone of the TV device for local time conversion
-      - name: ZIP_CODE_ARRAY
-        description: List of possible Zip Code locations of Household where TV was used
-      - name: DMA_ARRAY
-        description: List of Designated Market Area codes where TV was used
-      - name: CREATIVE_ID_ARRAY
-        description: List of Unique Identifiers for the creative of Ads viewed
-      - name: BRAND_NAME_ARRAY
-        description: List of brands of ads viewed | :lower :space-to-hyphen :str-list-col-pregen
-      - name: AD_TITLE_ARRAY
-        description: List of commercial ad titles viewed | :lower :space-to-hyphen :str-list-col-pregen
-      - name: COMMERCIAL_CATEGORY_ARRAY
-        description: List of commercial categories viewed | :lower :space-to-hyphen :str-list-col-pregen
-      - name: PREV_CONTENT_TITLE_ARRAY
-        description: List of content titles watched before the commercial | :lower :space-to-hyphen :str-list-col-pregen
-      - name: PREV_CONTENT_CALLSIGN_ARRAY
-        description: List of callsigns for content before the commercial | :lower :space-to-hyphen :str-list-col-pregen
-      - name: PREV_CONTENT_NETWORK_ARRAY
-        description: List of networks for content before the commercial | :lower :space-to-hyphen :str-list-col-pregen
-      - name: NEXT_CONTENT_TITLE_ARRAY
-        description: List of content titles watched after the commercial | :lower :space-to-hyphen :str-list-col-pregen
-      - name: NEXT_CONTENT_CALLSIGN_ARRAY
-        description: List of callsigns for content after the commercial | :lower :space-to-hyphen :str-list-col-pregen
-      - name: NEXT_CONTENT_NETWORK_ARRAY
-        description: List of networks for content after the commercial | :lower :space-to-hyphen :str-list-col-pregen
-      - name: INPUT_CATEGORY_ARRAY
-        description: List of input device categories used | :lower :space-to-hyphen :str-list-col-pregen
-      - name: INPUT_DEVICE_ARRAY
-        description: List of input devices used to watch content | :lower :space-to-hyphen :str-list-col-pregen
-      - name: APP_SERVICE_ARRAY
-        description: List of app services used | :lower :space-to-hyphen :str-list-col-pregen
+      - name: ZIP_CODE
+        description: Zip Code locations of Household where TV was used
+      - name: DMA
+        description: Designated Market Area codes where TV was used
+      - name: CREATIVE_ID_STR_LIST
+        description: Comma separated list of Creative IDs for ads viewed | :lower :space-to-hyphen :csv        
       - name: BRAND_NAME_STR_LIST
-        description: List of brands of ads viewed | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of brands of ads viewed | :lower :space-to-hyphen :csv
       - name: AD_TITLE_STR_LIST
-        description: List of commercial ad titles viewed | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of commercial ad titles viewed | :lower :space-to-hyphen :csv
       - name: COMMERCIAL_CATEGORY_STR_LIST
-        description: List of commercial categories viewed | :lower :space-to-hyphen :akkio-context-ignore
-      - name: PREV_CONTENT_TITLE_STR_LIST
-        description: List of content titles watched before commercials | :lower :space-to-hyphen :akkio-context-ignore
-      - name: NEXT_CONTENT_TITLE_STR_LIST
-        description: List of content titles watched after commercials | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of commercial categories viewed | :lower :space-to-hyphen :csv
       - name: INPUT_CATEGORY_STR_LIST
-        description: List of input device categories used | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of input device categories used | :lower :space-to-hyphen :csv
       - name: INPUT_DEVICE_STR_LIST
-        description: List of input devices used | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of input devices used | :lower :space-to-underscore :csv
       - name: APP_SERVICE_STR_LIST
-        description: List of app services used | :lower :space-to-hyphen :akkio-context-ignore
+        description: Comma separated list of app services used | :lower :space-to-hyphen :csv
       - name: TOTAL_AD_VIEWS
         description: Total number of commercial views for the day
         data_tests:
@@ -285,17 +211,10 @@ models:
         description: date commercial was viewed
         data_tests:
           - not_null
-      - name: TV_ID
-        description: Device ID hash for the TV Device
-        data_tests:
-          - not_null
       - name: AKKIO_ID
         description: Primary device identifier from Akkio (optimized - same value as TV_ID)
         data_tests:
           - not_null
-          - unique
-      - name: HASHED_IP
-        description: sha1 hash of IPv4 Address postfixed with salt
       - name: ZIP_CODE
         description: Zip Code of Household where TV was last used
       - name: DMA
@@ -353,7 +272,7 @@ models:
       - name: INPUT_CATEGORY
         description: Category of the input device generating the data | :lower :space-to-hyphen
       - name: INPUT_DEVICE_NAME
-        description: Name of the input device generating the data | :lower :space-to-hyphen
+        description: Name of the input device generating the data | :lower :space-to-underscore
       - name: APP_SERVICE
         description: Application or service used | :lower :space-to-hyphen
 
@@ -391,39 +310,10 @@ models:
         description: List of Zip Codes where TV was active
       - name: DMA_ARRAY
         description: List of Designated Market Area codes where TV was active
-      - name: CITY_ARRAY
-        description: List of cities where TV was active
-      - name: STATE_CODE_ARRAY
-        description: List of state codes where TV was active
-      - name: ZIP_CODE_STR_LIST
-        description: List of Zip Codes where TV was active | :akkio-context-ignore
-      - name: DMA_STR_LIST
-        description: List of Designated Market Area codes where TV was active | :akkio-context-ignore
-      - name: CITY_STR_LIST
-        description: List of cities where TV was active | :akkio-context-ignore
-      - name: STATE_CODE_STR_LIST
-        description: List of state codes where TV was active | :akkio-context-ignore
-      - name: FIRST_ACTIVITY_TIME
-        description: Timestamp of first activity session for the day
-      - name: LAST_ACTIVITY_TIME
-        description: Timestamp of last activity session for the day
-      - name: TOTAL_ACTIVITY_SECONDS
-        description: Total seconds of device activity during the day
-        data_tests:
-          - not_null
-          - dbt_utils.expression_is_true:
-              expression: ">= 0"
-      - name: TOTAL_SESSIONS
-        description: Total number of activity sessions for the day
-        data_tests:
-          - not_null
-          - dbt_utils.expression_is_true:
-              expression: "> 0"
 
   - name: vizio_daily_fact_standard_detail
     description: >
       Detail device activity and location data. This contains the same data as VIZIO_DAILY_FACT_STANDARD_SUMMARY table with ARRAY columns exploded into separate rows.
-      ONLY use this table when VIZIO_DAILY_FACT_STANDARD_SUMMARY contains insufficient detail to answer the query.
       This provides granular detail about each device activity session.
       | :short-name:device_activity_detail: :use_for_audience_gen: |<
     columns:
@@ -435,17 +325,10 @@ models:
         description: date of device activity
         data_tests:
           - not_null
-      - name: TV_ID
-        description: Device ID hash for the TV Device
-        data_tests:
-          - not_null
       - name: AKKIO_ID
         description: Primary device identifier from Akkio (optimized - same value as TV_ID)
         data_tests:
           - not_null
-          - unique
-      - name: HASHED_IP
-        description: sha1 hash of IPv4 Address postfixed with salt
       - name: TIMEZONE
         description: Timezone of the TV device for local time conversion
       - name: SESSION_START_TIME_UTC
