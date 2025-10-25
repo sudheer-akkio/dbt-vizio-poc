@@ -17,147 +17,100 @@
     Supports LATERAL VIEW EXPLODE pattern for categorical breakdowns.
 */
 
-WITH title_counts AS (
+WITH
+-- Filter source data early for testing
+-- Note: Using WHERE clause for filtering (partition pruning applies automatically)
+-- For testing, limit to single partition date to reduce data volume
+source_data AS (
     SELECT
         PARTITION_DATE,
         AKKIO_ID,
-        COALESCE(TITLE, 'unknown') AS TITLE_KEY,
-        COUNT(*) AS SESSION_COUNT
+        TITLE,
+        GENRE,
+        NETWORK,
+        INPUT_DEVICE_NAME,
+        INPUT_CATEGORY,
+        APP_SERVICE
     FROM {{ ref('vizio_daily_fact_content_detail') }}
-    GROUP BY
-        PARTITION_DATE,
-        AKKIO_ID,
-        COALESCE(TITLE, 'unknown')
+    WHERE PARTITION_DATE = '2025-06-24' -- Test with single day for faster iteration
+    -- Remove LIMIT for now - use single partition instead
 ),
 
--- Explode comma-separated genres and count sessions per genre
-genre_exploded AS (
-    SELECT
-        PARTITION_DATE,
-        AKKIO_ID,
-        TRIM(genre_value) AS GENRE_KEY
-    FROM {{ ref('vizio_daily_fact_content_detail') }}
-    LATERAL VIEW EXPLODE(SPLIT(COALESCE(GENRE, 'unknown'), ',')) AS genre_value
+-- Aggregations: Spark will optimize these to minimize actual table scans
+-- Since source is partitioned/clustered, multiple GROUP BYs are acceptable
+
+title_counts AS (
+    SELECT PARTITION_DATE, AKKIO_ID, COALESCE(TITLE, 'unknown') AS k, CAST(COUNT(*) AS BIGINT) AS v
+    FROM source_data
+    GROUP BY PARTITION_DATE, AKKIO_ID, COALESCE(TITLE, 'unknown')
+),
+
+title_maps AS (
+    SELECT PARTITION_DATE, AKKIO_ID, MAP_FROM_ENTRIES(COLLECT_LIST(STRUCT(k, v))) AS TITLES_WATCHED
+    FROM title_counts GROUP BY PARTITION_DATE, AKKIO_ID
 ),
 
 genre_counts AS (
-    SELECT
-        PARTITION_DATE,
-        AKKIO_ID,
-        COALESCE(NULLIF(GENRE_KEY, ''), 'unknown') AS GENRE_KEY,
-        COUNT(*) AS SESSION_COUNT
-    FROM genre_exploded
-    GROUP BY
-        PARTITION_DATE,
-        AKKIO_ID,
-        COALESCE(NULLIF(GENRE_KEY, ''), 'unknown')
+    SELECT PARTITION_DATE, AKKIO_ID, COALESCE(NULLIF(TRIM(g), ''), 'unknown') AS k, CAST(COUNT(*) AS BIGINT) AS v
+    FROM source_data
+    LATERAL VIEW EXPLODE(SPLIT(COALESCE(GENRE, 'unknown'), ',')) AS g
+    GROUP BY PARTITION_DATE, AKKIO_ID, COALESCE(NULLIF(TRIM(g), ''), 'unknown')
+),
+
+genre_maps AS (
+    SELECT PARTITION_DATE, AKKIO_ID, MAP_FROM_ENTRIES(COLLECT_LIST(STRUCT(k, v))) AS GENRES_WATCHED
+    FROM genre_counts GROUP BY PARTITION_DATE, AKKIO_ID
 ),
 
 network_counts AS (
-    SELECT
-        PARTITION_DATE,
-        AKKIO_ID,
-        COALESCE(NETWORK, 'unknown') AS NETWORK_KEY,
-        COUNT(*) AS SESSION_COUNT
-    FROM {{ ref('vizio_daily_fact_content_detail') }}
-    GROUP BY
-        PARTITION_DATE,
-        AKKIO_ID,
-        COALESCE(NETWORK, 'unknown')
+    SELECT PARTITION_DATE, AKKIO_ID, COALESCE(NETWORK, 'unknown') AS k, CAST(COUNT(*) AS BIGINT) AS v
+    FROM source_data
+    GROUP BY PARTITION_DATE, AKKIO_ID, COALESCE(NETWORK, 'unknown')
+),
+
+network_maps AS (
+    SELECT PARTITION_DATE, AKKIO_ID, MAP_FROM_ENTRIES(COLLECT_LIST(STRUCT(k, v))) AS NETWORKS_WATCHED
+    FROM network_counts GROUP BY PARTITION_DATE, AKKIO_ID
 ),
 
 device_counts AS (
-    SELECT
-        PARTITION_DATE,
-        AKKIO_ID,
-        COALESCE(INPUT_DEVICE_NAME, INPUT_CATEGORY, 'unknown') AS DEVICE_KEY,
-        COUNT(*) AS SESSION_COUNT
-    FROM {{ ref('vizio_daily_fact_content_detail') }}
-    GROUP BY
-        PARTITION_DATE,
-        AKKIO_ID,
-        COALESCE(INPUT_DEVICE_NAME, INPUT_CATEGORY, 'unknown')
+    SELECT PARTITION_DATE, AKKIO_ID, COALESCE(INPUT_DEVICE_NAME, INPUT_CATEGORY, 'unknown') AS k, CAST(COUNT(*) AS BIGINT) AS v
+    FROM source_data
+    GROUP BY PARTITION_DATE, AKKIO_ID, COALESCE(INPUT_DEVICE_NAME, INPUT_CATEGORY, 'unknown')
 ),
 
-app_service_counts AS (
-    SELECT
-        PARTITION_DATE,
-        AKKIO_ID,
-        COALESCE(APP_SERVICE, 'unknown') AS APP_SERVICE_KEY,
-        COUNT(*) AS SESSION_COUNT
-    FROM {{ ref('vizio_daily_fact_content_detail') }}
-    GROUP BY
-        PARTITION_DATE,
-        AKKIO_ID,
-        COALESCE(APP_SERVICE, 'unknown')
+device_maps AS (
+    SELECT PARTITION_DATE, AKKIO_ID, MAP_FROM_ENTRIES(COLLECT_LIST(STRUCT(k, v))) AS INPUT_DEVICES_USED
+    FROM device_counts GROUP BY PARTITION_DATE, AKKIO_ID
 ),
 
--- Get all unique partition_date + akkio_id combinations
-base_grain AS (
-    SELECT DISTINCT
-        PARTITION_DATE,
-        AKKIO_ID
-    FROM {{ ref('vizio_daily_fact_content_detail') }}
+app_counts AS (
+    SELECT PARTITION_DATE, AKKIO_ID, COALESCE(APP_SERVICE, 'unknown') AS k, CAST(COUNT(*) AS BIGINT) AS v
+    FROM source_data
+    GROUP BY PARTITION_DATE, AKKIO_ID, COALESCE(APP_SERVICE, 'unknown')
+),
+
+app_maps AS (
+    SELECT PARTITION_DATE, AKKIO_ID, MAP_FROM_ENTRIES(COLLECT_LIST(STRUCT(k, v))) AS APP_SERVICES_USED
+    FROM app_counts GROUP BY PARTITION_DATE, AKKIO_ID
+),
+
+base AS (
+    SELECT DISTINCT PARTITION_DATE, AKKIO_ID FROM source_data
 )
 
 SELECT
-    bg.PARTITION_DATE,
-    bg.AKKIO_ID,
-
-    -- Weight (fixed at 11 per requirements)
+    b.PARTITION_DATE,
+    b.AKKIO_ID,
     11 AS INSCAPE_WEIGHT,
-
-    -- Map of title -> count of sessions
-    MAP_FROM_ENTRIES(
-        COLLECT_LIST(
-            STRUCT(tc.TITLE_KEY AS key, tc.SESSION_COUNT AS value)
-        )
-    ) AS TITLES_WATCHED,
-
-    -- Map of genre -> count of sessions
-    MAP_FROM_ENTRIES(
-        COLLECT_LIST(
-            STRUCT(gc.GENRE_KEY AS key, gc.SESSION_COUNT AS value)
-        )
-    ) AS GENRES_WATCHED,
-
-    -- Map of network -> count of sessions
-    MAP_FROM_ENTRIES(
-        COLLECT_LIST(
-            STRUCT(nc.NETWORK_KEY AS key, nc.SESSION_COUNT AS value)
-        )
-    ) AS NETWORKS_WATCHED,
-
-    -- Map of device/category -> count of sessions
-    MAP_FROM_ENTRIES(
-        COLLECT_LIST(
-            STRUCT(dc.DEVICE_KEY AS key, dc.SESSION_COUNT AS value)
-        )
-    ) AS INPUT_DEVICES_USED,
-
-    -- Map of app service -> count of sessions
-    MAP_FROM_ENTRIES(
-        COLLECT_LIST(
-            STRUCT(asc.APP_SERVICE_KEY AS key, asc.SESSION_COUNT AS value)
-        )
-    ) AS APP_SERVICES_USED
-
-FROM base_grain bg
-LEFT JOIN title_counts tc
-    ON bg.PARTITION_DATE = tc.PARTITION_DATE
-    AND bg.AKKIO_ID = tc.AKKIO_ID
-LEFT JOIN genre_counts gc
-    ON bg.PARTITION_DATE = gc.PARTITION_DATE
-    AND bg.AKKIO_ID = gc.AKKIO_ID
-LEFT JOIN network_counts nc
-    ON bg.PARTITION_DATE = nc.PARTITION_DATE
-    AND bg.AKKIO_ID = nc.AKKIO_ID
-LEFT JOIN device_counts dc
-    ON bg.PARTITION_DATE = dc.PARTITION_DATE
-    AND bg.AKKIO_ID = dc.AKKIO_ID
-LEFT JOIN app_service_counts asc
-    ON bg.PARTITION_DATE = asc.PARTITION_DATE
-    AND bg.AKKIO_ID = asc.AKKIO_ID
-GROUP BY
-    bg.PARTITION_DATE,
-    bg.AKKIO_ID
+    t.TITLES_WATCHED,
+    g.GENRES_WATCHED,
+    n.NETWORKS_WATCHED,
+    d.INPUT_DEVICES_USED,
+    a.APP_SERVICES_USED
+FROM base b
+LEFT JOIN title_maps t USING (PARTITION_DATE, AKKIO_ID)
+LEFT JOIN genre_maps g USING (PARTITION_DATE, AKKIO_ID)
+LEFT JOIN network_maps n USING (PARTITION_DATE, AKKIO_ID)
+LEFT JOIN device_maps d USING (PARTITION_DATE, AKKIO_ID)
+LEFT JOIN app_maps a USING (PARTITION_DATE, AKKIO_ID)
