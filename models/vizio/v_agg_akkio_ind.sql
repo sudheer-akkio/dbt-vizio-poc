@@ -27,8 +27,8 @@ SELECT
     COALESCE(attr.GENDER, 'UNDETERMINED') AS GENDER,
     attr.AGE,
     attr.AGE_BUCKET,
-    attr.ETHNICITY,
-    attr.EDUCATION_LEVEL,
+    attr.ETHNICITY AS ETHNICITY_PREDICTION,
+    attr.EDUCATION_LEVEL as EDUCATION,
     attr.MARITAL_STATUS,
 
     -- Household-level attributes (needed for audience queries - same as Horizon's V_AGG_BLU_IND)
