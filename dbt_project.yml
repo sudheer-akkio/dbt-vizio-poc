@@ -43,7 +43,7 @@ models:
     vizio:
       +tags: 
         - vizio
-      +database: akkio
+      +database: akkio      
       # Databricks optimizations for large-scale processing
       # +file_format: delta
       # +on_schema_change: 'sync_all_columns'
