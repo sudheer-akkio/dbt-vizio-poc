@@ -28,6 +28,10 @@ SELECT
     
     -- Household Income
     HOUSEHOLD_INCOME_K AS INCOME,
+    CASE
+        WHEN HAS_CHILDREN_0_18 = 'Y' THEN 1
+        ELSE 0
+    END AS PRESENCE_OF_CHILDREN,
     INCOME_BUCKET,
     
     -- Temporal
