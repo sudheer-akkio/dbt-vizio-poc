@@ -75,7 +75,7 @@ SELECT
 
     -- Household-level attributes (needed for audience queries - same as Horizon's V_AGG_BLU_IND)
     attr.HOME_OWNERSHIP AS HOMEOWNER,
-    attr.HOUSEHOLD_INCOME_K AS INCOME,
+    attr.HOUSEHOLD_INCOME_K * 1000 AS INCOME,
     attr.INCOME_BUCKET,
 
     -- Contact identifiers (counts, not arrays, for insights compatibility)
