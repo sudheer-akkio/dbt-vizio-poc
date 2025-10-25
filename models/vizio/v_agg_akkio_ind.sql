@@ -77,6 +77,7 @@ SELECT
     attr.HOME_OWNERSHIP AS HOMEOWNER,
     attr.HOUSEHOLD_INCOME_K * 1000 AS INCOME,
     attr.INCOME_BUCKET,
+    attr.ZIP11 AS ZIP_CODE,
 
     -- Contact identifiers (counts, not arrays, for insights compatibility)
     0 AS MAIDS,
