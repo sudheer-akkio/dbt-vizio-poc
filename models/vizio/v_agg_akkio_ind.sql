@@ -39,7 +39,7 @@ SELECT
     attr.INCOME_BUCKET,
     attr.ZIP11 AS ZIP_CODE,
 
-    COALESCE(CAST(attr.NET_WORTH AS STRING), 'Unknown') AS NET_WORTH,
+    COALESCE(CAST(attr.NET_WORTH AS STRING), 'Unknown') AS NET_WORTH_BUCKET,
     -- Contact identifiers (counts, not arrays, for insights compatibility)
     0 AS MAIDS,
     0 AS IPS,
