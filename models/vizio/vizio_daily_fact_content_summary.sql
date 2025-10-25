@@ -1,5 +1,5 @@
 {{ config(
-    alias='PV_VIZIO_DAILY_FACT_CONTENT_SUMMARY',
+    alias='VIZIO_DAILY_FACT_CONTENT_SUMMARY',
     materialized='table',
     unique_key = ['PARTITION_DATE', 'AKKIO_ID'],
     post_hook=[

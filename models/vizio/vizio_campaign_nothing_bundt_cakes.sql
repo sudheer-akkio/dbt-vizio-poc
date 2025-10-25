@@ -1,5 +1,5 @@
 {{ config(
-    alias='PV_VIZIO_CAMPAIGN_NOTHING_BUNDT_CAKES',
+    alias='VIZIO_CAMPAIGN_NOTHING_BUNDT_CAKES',
     materialized='incremental',
     post_hook=[    
         "alter table {{this}} cluster by (impression_date, akkio_id)", 

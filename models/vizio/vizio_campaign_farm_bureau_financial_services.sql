@@ -1,5 +1,5 @@
 {{ config(
-    alias='PV_VIZIO_CAMPAIGN_FARM_BUREAU_FINANCIAL_SERVICES',
+    alias='VIZIO_CAMPAIGN_FARM_BUREAU_FINANCIAL_SERVICES',
     materialized='incremental',
     post_hook=[    
         "alter table {{this}} cluster by (impression_date, akkio_id)", 

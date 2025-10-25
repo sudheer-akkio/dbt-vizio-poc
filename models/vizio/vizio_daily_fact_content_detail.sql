@@ -1,5 +1,5 @@
 {{ config(
-    alias='PV_VIZIO_DAILY_FACT_CONTENT_DETAIL',
+    alias='VIZIO_DAILY_FACT_CONTENT_DETAIL',
     materialized='incremental',
     post_hook=[    
         "alter table {{this}} cluster by (viewed_date, akkio_id)", 

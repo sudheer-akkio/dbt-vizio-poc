@@ -1,5 +1,5 @@
 {{ config(
-    alias='PV_VIZIO_DAILY_FACT_COMMERCIAL_DETAIL',
+    alias='VIZIO_DAILY_FACT_COMMERCIAL_DETAIL',
     materialized='incremental',
     unique_key=['PARTITION_DATE', 'AKKIO_ID'],
     incremental_strategy='merge',
