@@ -40,7 +40,7 @@ SELECT
     attr.ZIP11 AS ZIP_CODE,
 
 
-    COALESCE(NULLIF(attr.NETWORK, ''), 'Unknown') AS NET_WORTH,
+    COALESCE(NULLIF(attr.NET_WORTH, ''), 'Unknown') AS NET_WORTH,
     -- Contact identifiers (counts, not arrays, for insights compatibility)
     0 AS MAIDS,
     0 AS IPS,
