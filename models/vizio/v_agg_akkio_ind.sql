@@ -27,11 +27,11 @@ SELECT
     COALESCE(attr.GENDER, 'UNDETERMINED') AS GENDER,
     attr.AGE,
     attr.AGE_BUCKET,
-    attr.ETHNICITY AS ETHNICITY_PREDICTION,
-    attr.EDUCATION_LEVEL as EDUCATION,
-    attr.MARITAL_STATUS,
+    COALESCE(attr.ETHNICITY, 'Unknown') AS ETHNICITY_PREDICTION,
+    COALESCE(attr.EDUCATION_LEVEL, 'Unknown') as EDUCATION,
+    COALESCE(attr.MARITAL_STATUS, 'Unknown') as MARITAL_STATUS,
 
-    attr.STATE,
+    COALESCE(attr.STATE, 'Unknown') AS STATE,
 
     -- Household-level attributes (needed for audience queries - same as Horizon's V_AGG_BLU_IND)
     attr.HOME_OWNERSHIP AS HOMEOWNER,
