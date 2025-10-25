@@ -276,45 +276,10 @@ models:
       - name: APP_SERVICE
         description: Application or service used | :lower :space-to-hyphen
 
-  - name: vizio_daily_fact_standard_summary
-    description: >
-      Standard device activity and location data aggregated per given day.
-      TRY to use this table instead of VIZIO_DAILY_FACT_STANDARD_DETAIL, unless this table does not contain enough detail for the query.
-      | :short-name:device_activity: :use_for_audience_gen: |<
-    data_tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - PARTITION_DATE
-            - TV_ID
-    columns:
-      - name: PARTITION_DATE
-        description: partition_date | :akkio-context-ignore |
-        data_tests:
-          - not_null
-      - name: ACTIVITY_DATE
-        description: date of device activity
-        data_tests:
-          - not_null
-      - name: TV_ID
-        description: Device ID hash for the TV Device
-        data_tests:
-          - not_null
-      - name: AKKIO_ID
-        description: Primary device identifier from Akkio (optimized - same value as TV_ID)
-        data_tests:
-          - not_null
-          - unique
-      - name: TIMEZONE
-        description: Timezone of the TV device for local time conversion
-      - name: ZIP_CODE_ARRAY
-        description: List of Zip Codes where TV was active
-      - name: DMA_ARRAY
-        description: List of Designated Market Area codes where TV was active
 
   - name: vizio_daily_fact_standard_detail
     description: >
-      Detail device activity and location data. This contains the same data as VIZIO_DAILY_FACT_STANDARD_SUMMARY table with ARRAY columns exploded into separate rows.
-      This provides granular detail about each device activity session.
+      Detail device activity and location data. This provides granular detail about each device.
       | :short-name:device_activity_detail: :use_for_audience_gen: |<
     columns:
       - name: PARTITION_DATE
@@ -326,19 +291,11 @@ models:
         data_tests:
           - not_null
       - name: AKKIO_ID
-        description: Primary device identifier from Akkio (optimized - same value as TV_ID)
+        description: Primary device identifier from Akkio
         data_tests:
           - not_null
       - name: TIMEZONE
         description: Timezone of the TV device for local time conversion
-      - name: SESSION_START_TIME_UTC
-        description: Start time of activity session in UTC
-        data_tests:
-          - not_null
-      - name: SESSION_END_TIME_UTC
-        description: End time of activity session in UTC
-        data_tests:
-          - not_null
       - name: TOTAL_SECONDS
         description: Total seconds of this activity session
         data_tests:
@@ -368,17 +325,10 @@ models:
         description: date of the ad impression
         data_tests:
           - not_null
-      - name: TV_ID
-        description: Device ID hash for the TV Device
-        data_tests:
-          - not_null
       - name: AKKIO_ID
         description: Primary device identifier from Akkio (optimized - same value as TV_ID)
         data_tests:
           - not_null
-          - unique
-      - name: HASHED_IP
-        description: sha1 hash of IPv4 Address postfixed with salt
       - name: IMPRESSION_TIMESTAMP
         description: Exact timestamp of ad impression in UTC
         data_tests:
@@ -389,8 +339,12 @@ models:
         description: Zip Code of Household where impression occurred
       - name: MARKET
         description: Market name where impression occurred
-        data_tests:
-          - not_null
+      - name: CITY
+        description: City where TV was active
+      - name: STATE_CODE
+        description: State code where TV was active
+      - name: DMA
+        description: Designated Market Area code of the device location          
       - name: MARKET_TV_POPULATION
         description: Total Inscape TV population in the market for reach calculations
         data_tests:
@@ -424,17 +378,10 @@ models:
         description: date of the ad impression
         data_tests:
           - not_null
-      - name: TV_ID
-        description: Device ID hash for the TV Device
-        data_tests:
-          - not_null
       - name: AKKIO_ID
         description: Primary device identifier from Akkio (optimized - same value as TV_ID)
         data_tests:
           - not_null
-          - unique
-      - name: HASHED_IP
-        description: sha1 hash of IPv4 Address postfixed with salt
       - name: IMPRESSION_TIMESTAMP
         description: Exact timestamp of ad impression in UTC
         data_tests:
@@ -445,8 +392,12 @@ models:
         description: Zip Code of Household where impression occurred
       - name: MARKET
         description: Market name where impression occurred
-        data_tests:
-          - not_null
+      - name: CITY
+        description: City where TV was active
+      - name: STATE_CODE
+        description: State code where TV was active
+      - name: DMA
+        description: Designated Market Area code of the device location                
       - name: MARKET_TV_POPULATION
         description: Total Inscape TV population in the market for reach calculations
         data_tests:
@@ -468,7 +419,7 @@ models:
       - name: LOCAL_OR_NATIONAL
         description: Local or national broadcast indicator
       - name: SESSION_TYPE
-        description: Type of viewing session (Live, DVR, etc.)
+        description: Type of viewing session
       - name: SESSION_SOURCE
         description: Source of the viewing session data
 

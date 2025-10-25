@@ -2,7 +2,7 @@
     alias='PV_VIZIO_DAILY_FACT_STANDARD_DETAIL',
     materialized='incremental',
     post_hook=[    
-        "alter table {{this}} cluster by (viewed_date, akkio_id)", 
+        "alter table {{this}} cluster by (activity_date, akkio_id)", 
     ]
 )}}
 
@@ -10,7 +10,7 @@ WITH
 ipage AS (
     SELECT *,
 	ROW_NUMBER() OVER (PARTITION BY date_partition, hash ORDER BY ts_start) as row_num,
-	SUM() OVER (PARTITION BY date_partition, hash) as all_total_seconds
+	SUM(DATEDIFF(SECOND, i.ts_start, i.ts_end)) OVER (PARTITION BY date_partition, hash) as all_total_seconds
     FROM {{ source('vizio_poc_share', 'production_r2081_ipage')}} as i
 	WHERE i.hash IS NOT NULL
     {% if var('start_date', None) and var('end_date', None) %}
@@ -27,8 +27,6 @@ SELECT
     i.date_partition AS ACTIVITY_DATE,
     i.hash AS AKKIO_ID,
     tz.timezone AS TIMEZONE,
-    -- i.ts_start AS SESSION_START_TIME_UTC,
-    -- i.ts_end AS SESSION_END_TIME_UTC,
     all_total_seconds AS TOTAL_SECONDS,
     i.city AS CITY,
     i.iso_state AS STATE_CODE,
@@ -38,5 +36,5 @@ FROM ipage i
 LEFT JOIN timezone_mapping tz
     ON i.hash = tz.hash
 WHERE i.hash IS NOT NULL
-AND i.row_num = 0
+AND i.row_num = 1
 
