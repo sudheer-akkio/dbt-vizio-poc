@@ -21,39 +21,32 @@ WITH
 content_ips AS (
     SELECT 
         AKKIO_ID,
-        HASHED_IP
     FROM {{ ref('vizio_daily_fact_content_detail') }}
-    WHERE HASHED_IP IS NOT NULL
 ),
 
 -- Collect all unique IPs from commercial viewing activity
 commercial_ips AS (
     SELECT 
         AKKIO_ID,
-        HASHED_IP
     FROM {{ ref('vizio_daily_fact_commercial_detail') }}
-    WHERE HASHED_IP IS NOT NULL
 ),
 
 -- Collect all unique IPs from standard device activity
 standard_ips AS (
     SELECT 
         AKKIO_ID,
-        HASHED_IP
     FROM {{ ref('vizio_daily_fact_standard_detail') }}
-    WHERE HASHED_IP IS NOT NULL
 ),
 -- Union all IP sources and aggregate by AKKIO_ID
 aggregated_ips AS (
     SELECT 
         AKKIO_ID,
-        COLLECT_SET(HASHED_IP) AS IPS_ARRAY
     FROM (
-        SELECT AKKIO_ID, HASHED_IP FROM content_ips
+        SELECT AKKIO_ID FROM content_ips
         UNION ALL
-        SELECT AKKIO_ID, HASHED_IP FROM commercial_ips
+        SELECT AKKIO_ID FROM commercial_ips
         UNION ALL
-        SELECT AKKIO_ID, HASHED_IP FROM standard_ips    )
+        SELECT AKKIO_ID FROM standard_ips    )
     GROUP BY AKKIO_ID
 )
 
@@ -80,7 +73,7 @@ SELECT
 
     -- Contact identifiers (counts, not arrays, for insights compatibility)
     0 AS MAIDS,
-    COALESCE(SIZE(ips.IPS_ARRAY), 0) AS IPS,
+    0 AS IPS,
     0 AS EMAILS,
     0 AS PHONES,
 

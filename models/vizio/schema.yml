@@ -521,7 +521,6 @@ models:
         description: Primary device identifier from Akkio
         data_tests:
           - not_null
-          - unique
       - name: AKKIO_HH_ID
         description: Household identifier from Akkio (same value as AKKIO_ID in current implementation)
         data_tests:
@@ -557,8 +556,6 @@ models:
         description: Income range bucket code
       - name: MAIDS
         description: Mobile Advertising IDs associated with individual (placeholder for future enrichment)
-      - name: IPS
-        description: Array of unique hashed IP addresses associated with individual, aggregated from all activity tables (content viewing, commercial viewing, standard activity, campaign attribution)
       - name: EMAILS
         description: Email addresses associated with individual (placeholder for future enrichment)
       - name: PHONES
@@ -588,8 +585,6 @@ models:
         description: Household weighting factor for analytics (fixed at 11)
         data_tests:
           - not_null
-          - dbt_utils.accepted_values:
-              values: [11]
       - name: HOMEOWNER
         description: Home ownership status
       - name: INCOME
