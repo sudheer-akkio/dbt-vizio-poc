@@ -31,7 +31,7 @@ SELECT
     COALESCE(attr.EDUCATION_LEVEL, 'Unknown') as EDUCATION,
     COALESCE(attr.MARITAL_STATUS, 'Unknown') as MARITAL_STATUS,
 
-    COALESCE(attr.STATE, 'Unknown') AS STATE,
+    COALESCE(NULLIF(attr.STATE, ''), 'Unknown') AS STATE
 
     -- Household-level attributes (needed for audience queries - same as Horizon's V_AGG_BLU_IND)
     attr.HOME_OWNERSHIP AS HOMEOWNER,
