@@ -32,8 +32,6 @@ source_data AS (
         INPUT_CATEGORY,
         APP_SERVICE
     FROM {{ ref('vizio_daily_fact_content_detail') }}
-    WHERE PARTITION_DATE = '2025-06-24' -- Test with single day for faster iteration
-    -- Remove LIMIT for now - use single partition instead
 ),
 
 -- Aggregations: Spark will optimize these to minimize actual table scans
