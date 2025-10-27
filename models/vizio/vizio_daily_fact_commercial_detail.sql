@@ -1,6 +1,7 @@
 {{ config(
+    alias='VIZIO_DAILY_FACT_COMMERCIAL_DETAIL',
     materialized='incremental',
-    unique_key=['PARTITION_DATE', 'TV_ID'],
+    unique_key=['PARTITION_DATE', 'AKKIO_ID'],
     incremental_strategy='merge',
     partition_by="PARTITION_DATE",
 )}}
@@ -38,6 +39,7 @@ commercial_filtered AS (
         app_service
     FROM {{ source('vizio_poc_share', 'production_r2080_commercialfeedmodular') }}
     WHERE hash IS NOT NULL
+	AND duration > 0
     {% if var('start_date', None) and var('end_date', None) %}
         -- Batch processing mode: use --vars '{"start_date": "2024-01-01", "end_date": "2024-01-31"}'
         AND date_partition BETWEEN '{{ var("start_date") }}' AND '{{ var("end_date") }}'
@@ -64,9 +66,7 @@ enriched_commercial AS (
     SELECT
         c.date_partition AS PARTITION_DATE,
         c.date_partition AS VIEWED_DATE,
-        c.hash AS TV_ID,
         c.hash AS AKKIO_ID,
-        c.ip AS HASHED_IP,
         c.zipcode AS ZIP_CODE,
         c.dma AS DMA,
         tz.timezone AS TIMEZONE,
@@ -74,24 +74,25 @@ enriched_commercial AS (
         c.ts_start AS AD_MATCH_START_TIME_UTC,
         c.ts_end AS AD_MATCH_END_TIME_UTC,
         CAST(c.duration AS INT) AS AD_LENGTH,
-        lower(replace(c.brand_name, ' ', '-')) AS BRAND_NAME,
-        lower(replace(c.title, ' ', '-')) AS AD_TITLE,
-        lower(replace(cc.commercial_category, ' ', '-')) AS COMMERCIAL_CATEGORY,
+        lower(regexp_replace(replace(c.brand_name, '''’', ''), '[\\s,_/:;|.-]+', '-')) AS BRAND_NAME,
+        lower(regexp_replace(replace(c.title, '''’', ''), '[\\s,_/:;|.-]+', '-')) AS AD_TITLE,
+        lower(regexp_replace(replace(cc.commercial_category, ' / ', '/'), '[\\s,-]+', '-')) AS COMMERCIAL_CATEGORY,
         c.prev_episode_id AS PREV_EPISODE_ID,
-        lower(replace(c.prev_title, ' ', '-')) AS PREV_TITLE,
+        lower(regexp_replace(c.prev_title, '[\\s\'’,:.-]+', '-')) AS PREV_TITLE,
+		lower(regexp_replace(c.next_title, '[\\s\'’,:.-]+', '-')) AS NEXT_TITLE,
         c.prev_ts_start AS PREV_CONTENT_START_TIME_UTC,
         c.prev_ts_end AS PREV_CONTENT_END_TIME_UTC,
         lower(replace(c.prev_channel_callsign, ' ', '-')) AS PREV_CALLSIGN,
         lower(replace(c.prev_network_affiliate, ' ', '-')) AS PREV_NETWORK,
         c.next_episode_id AS NEXT_EPISODE_ID,
-        lower(replace(c.next_title, ' ', '-')) AS NEXT_TITLE,
+        
         c.next_ts_start AS NEXT_CONTENT_START_TIME_UTC,
         c.next_ts_end AS NEXT_CONTENT_END_TIME_UTC,
         lower(replace(c.next_channel_callsign, ' ', '-')) AS NEXT_CALLSIGN,
         lower(replace(c.next_network_affiliate, ' ', '-')) AS NEXT_NETWORK,
         c.live AS SESSION_TYPE,
         c.input_category AS INPUT_CATEGORY,
-        lower(replace(c.input_device, ' ', '-')) AS INPUT_DEVICE_NAME,
+        lower(replace(c.input_device, ' ', '_')) AS INPUT_DEVICE_NAME, -- data in this col already has underscore seperators
         lower(replace(c.app_service, ' ', '-')) AS APP_SERVICE
     FROM commercial_filtered c
     LEFT JOIN commercial_category cc
@@ -100,4 +101,3 @@ enriched_commercial AS (
         ON c.hash = tz.hash
 )
 SELECT * FROM enriched_commercial
-
