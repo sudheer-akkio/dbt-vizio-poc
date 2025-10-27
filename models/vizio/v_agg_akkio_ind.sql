@@ -37,7 +37,7 @@ SELECT
     attr.HOME_OWNERSHIP AS HOMEOWNER,
     attr.HOUSEHOLD_INCOME_K * 1000 AS INCOME,
     attr.INCOME_BUCKET,
-    attr.ZIP11 AS ZIP_CODE,
+    RIGHT(attr.ZIP11, 5) AS ZIP_CODE,
 
     COALESCE(CAST(attr.NET_WORTH AS STRING), 'Unknown') AS NET_WORTH_BUCKET,
     -- Contact identifiers (counts, not arrays, for insights compatibility)
