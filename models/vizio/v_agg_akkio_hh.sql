@@ -20,8 +20,8 @@ SELECT
     -- Primary Key
     AKKIO_HH_ID,
     
-    -- Weight (fixed at 11 per requirements)
-    11 AS HH_WEIGHT,
+    -- Weight (fixed at 1 per requirements)
+    1 AS HH_WEIGHT,
     
     -- Home Ownership
     HOME_OWNERSHIP AS HOMEOWNER,

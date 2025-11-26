@@ -526,11 +526,11 @@ models:
         data_tests:
           - not_null
       - name: WEIGHT
-        description: Individual weighting factor for analytics (fixed at 11)
+        description: Individual weighting factor for analytics (fixed at 1)
         data_tests:
           - not_null
           - dbt_utils.accepted_values:
-              values: [11]
+              values: [1]
       - name: GENDER
         description: Gender of primary viewer
       - name: AGE
@@ -582,7 +582,7 @@ models:
           - not_null
           - unique
       - name: HH_WEIGHT
-        description: Household weighting factor for analytics (fixed at 11)
+        description: Household weighting factor for analytics (fixed at 1)
         data_tests:
           - not_null
       - name: HOMEOWNER
