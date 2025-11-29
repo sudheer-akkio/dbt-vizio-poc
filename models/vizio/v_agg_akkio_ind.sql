@@ -20,8 +20,8 @@ SELECT
     attr.AKKIO_ID,
     attr.AKKIO_HH_ID,
 
-    -- Weight (fixed at 11 per requirements)
-    11 AS WEIGHT,
+    -- Weight (fixed at 1 per requirements)
+    1 AS WEIGHT,
 
     -- Demographics (convert NULL to 'UNDETERMINED' to match Horizon schema for insights compatibility)
     COALESCE(attr.GENDER, 'UNDETERMINED') AS GENDER,

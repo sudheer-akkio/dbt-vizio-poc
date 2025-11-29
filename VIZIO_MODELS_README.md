@@ -96,13 +96,13 @@ This implementation creates a comprehensive data modeling layer for Vizio TV vie
 
 **Key Features - v_agg_akkio_hh:**
 - Household-level grain (AKKIO_HH_ID)
-- Fixed weight value of 11 per requirements
+- Fixed weight value of 1 per requirements
 - Home ownership, household income, and income bracket
 - Clustered by (PARTITION_DATE, AKKIO_HH_ID)
 
 **Key Features - v_agg_akkio_ind:**
 - Individual-level grain (AKKIO_ID)
-- Fixed weight value of 11 per requirements
+- Fixed weight value of 1 per requirements
 - Demographics: Gender, Age, Age Bucket
 - IP addresses aggregated from all activity tables (content, commercial, standard, campaigns)
 - Placeholder fields for future enrichment: MAIDS, EMAILS, PHONES
