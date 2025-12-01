@@ -5,22 +5,22 @@ This implementation creates a comprehensive data modeling layer for Vizio TV vie
 
 ### Model Inventory (11 Total Models)
 
-**Fact Tables (6 models):**
+**Fact Tables (5 models):**
 - `vizio_daily_fact_content_detail` - Granular content viewing sessions
 - `vizio_daily_fact_content_summary` - Daily aggregated content viewing
 - `vizio_daily_fact_commercial_detail` - Granular commercial/ad views
 - `vizio_daily_fact_commercial_summary` - Daily aggregated commercial/ad views
-- `vizio_daily_fact_standard_detail` - Granular device activity sessions
-- `vizio_daily_fact_standard_summary` - Daily aggregated device activity
+- `vizio_daily_fact_standard_detail` - Device activity sessions (aggregated to one row per device per day)
 
 **Campaign Attribution Tables (2 models):**
 - `vizio_campaign_nothing_bundt_cakes` - Nothing Bundt Cakes campaign impressions
 - `vizio_campaign_farm_bureau_financial_services` - Farm Bureau Financial Services campaign impressions
 
-**Demographic & Household Tables (3 models):**
+**Demographic & Household Tables (4 models):**
 - `v_akkio_attributes_latest` - Latest demographic attributes from Experian (decoded)
 - `v_agg_akkio_hh` - Household-level demographic aggregation
-- `v_agg_akkio_ind` - Individual-level demographic aggregation with IP collection
+- `v_agg_akkio_ind` - Individual-level demographic aggregation
+- `v_agg_akkio_media` - Individual-level media viewing behavior aggregation
 
 ## Data Architecture
 
@@ -31,11 +31,15 @@ This implementation creates a comprehensive data modeling layer for Vizio TV vie
 - **vizio_daily_fact_content_summary.sql**: Daily aggregation by TV_ID with array and string list fields
 
 **Key Features:**
-- Joins with `mk_akkio_genre_title_mapping` for genre enrichment
-- Joins with `mk_akkio_tvtimezone_mapping` for timezone enrichment
-- Standardizes text fields to lowercase with hyphens
-- Captures viewing duration, input device, app service, and network details
-- Filters out null TV_IDs and show titles
+- Joins with `mk_akkio_genre_title_mapping` on episode_id for genre enrichment (LEFT JOIN)
+- Joins with `mk_akkio_tvtimezone_mapping` on hash for timezone enrichment (LEFT JOIN)
+- Standardizes text fields: lowercase with spaces replaced by hyphens (networks, titles, genres, callsigns)
+- Input device names use underscores instead of hyphens
+- Input categories converted to uppercase
+- Filters out NULL device hashes and NULL show titles
+- Minimum viewing duration filter: sessions must be > 10 seconds
+- Calculates viewing duration: `DATEDIFF(SECOND, ts_start, ts_end)`
+- Genre normalization: replaces ', ' with ',' before processing
 - Includes device timezone for local time conversion analysis
 
 ### 2. Commercial/Advertisement Models
@@ -45,11 +49,18 @@ This implementation creates a comprehensive data modeling layer for Vizio TV vie
 - **vizio_daily_fact_commercial_summary.sql**: Daily aggregation with commercial metrics
 
 **Key Features:**
-- Joins with `mk_commercialcategory_mapping` for commercial categorization
-- Joins with `mk_akkio_tvtimezone_mapping` for timezone enrichment
-- Captures previous and next content context (episode ID, title, network, callsign)
+- Joins with `mk_commercialcategory_mapping` on creative value for commercial categorization (LEFT JOIN)
+- Joins with `mk_akkio_tvtimezone_mapping` on hash for timezone enrichment (LEFT JOIN)
+- Filters out NULL device hashes and ads with duration <= 0
+- Advanced text standardization for brand names and ad titles:
+  - Removes special characters (quotes, apostrophes)
+  - Standardizes separators (spaces, commas, colons, periods) to hyphens using regex
+  - Converts to lowercase
+- Commercial category normalization: normalizes forward slashes (e.g., "Food / Beverage" → "food/beverage")
+- Captures previous and next content context (episode ID, title, network, callsign, timestamps)
 - Tracks brand names, ad titles, and creative IDs
 - Includes ad length and total ad viewing metrics
+- Uses incremental materialization with merge strategy for efficient updates
 - Includes device timezone for local time conversion analysis
 
 ### 3. Standard Device Activity Models
@@ -59,10 +70,14 @@ This implementation creates a comprehensive data modeling layer for Vizio TV vie
 - **vizio_daily_fact_standard_summary.sql**: Daily aggregation with activity metrics
 
 **Key Features:**
-- Joins with `mk_akkio_tvtimezone_mapping` for timezone enrichment
+- Joins with `mk_akkio_tvtimezone_mapping` on hash for timezone enrichment (LEFT JOIN)
+- Filters out NULL device hashes
+- Deduplication logic: Uses window functions to aggregate multiple sessions per device per day
+  - `ROW_NUMBER() OVER (PARTITION BY date_partition, hash ORDER BY ts_start)` to select first session
+  - `SUM(DATEDIFF(SECOND, ts_start, ts_end)) OVER (PARTITION BY date_partition, hash)` to sum total seconds
+  - Ensures one row per device per day
 - Tracks device location (city, state, DMA, zip code)
-- Captures session start/end times and duration
-- Provides first/last activity times and total session counts
+- Captures total activity duration across all sessions for the day
 - Includes device timezone for local time conversion analysis
 
 ### 4. Campaign Attribution Models
@@ -72,7 +87,12 @@ This implementation creates a comprehensive data modeling layer for Vizio TV vie
 - **vizio_campaign_farm_bureau_financial_services.sql**: Farm Bureau Financial Services campaign tracking
 
 **Key Features:**
-- Joins with `mk_akkio_tvtimezone_mapping` for timezone enrichment
+- Joins with market population tables on market name for reach calculations (LEFT JOIN)
+- Joins with `mk_akkio_tvtimezone_mapping` on hashed_tvid for timezone enrichment (LEFT JOIN)
+- Joins with `v_akkio_attributes_latest` on device ID to enrich with latest location data (city, state, DMA)
+- Filters out NULL device identifiers (hashed_tvid)
+- Text standardization: show titles, station call signs, channel affiliates converted to lowercase with spaces replaced by hyphens
+- Show titles also remove special characters (quotes, commas, colons, periods) using regex
 - Links impressions to market TV population for reach analysis
 - Captures show context during impression (title, station, channel affiliate)
 - Tracks local vs national broadcast
@@ -87,38 +107,67 @@ This implementation creates a comprehensive data modeling layer for Vizio TV vie
 - **v_agg_akkio_ind.sql**: Individual-level aggregation with IP addresses collected from activity tables
 
 **Key Features - v_akkio_attributes_latest:**
-- Decodes Experian demographic data into categorical columns
-- Household composition analysis (not individual binary flags)
-- Deterministic deduplication strategy for reproducible results
-- Decoded attributes: Gender, Age (with buckets), Education Level, Ethnicity, Income (with brackets)
-- Household composition flags: Home ownership, marital status, presence of children
-- Data quality indicators for filtering
+- Decodes Experian demographic data from household-level counts into categorical columns
+- Source data contains household counts (e.g., "2 males aged 25-34") not individual flags
+- Each device hash represents one unique household (source already deduplicated)
+- Joins with `production_r2081_ipage` to enrich with latest location data (city, state, DMA, zip)
+  - Uses `ROW_NUMBER() OVER (PARTITION BY hash ORDER BY date_partition DESC)` to get most recent location
+- Decoding logic:
+  - **Gender**: Determined by presence of any male/female household members (M/F/NULL)
+  - **Age**: First matching age range bucket found (18, 25, 35, 45, 55, 65)
+  - **Ethnicity**: First matching ethnicity found in household composition
+  - **Education**: Highest level found (Graduate > College > Some College > High School)
+  - **Income**: First matching income bracket found (lower bound in thousands)
+- Household composition flags: Home ownership (1/0/NULL), marital status, presence of children/babies
+- Data quality indicators: LOW_QUALITY_FLAG, DEMO_INCOMPLETE_FLAG
+- Geographic attributes: STATE, ZIP11 (11-digit padded), CITY, DMA_NAME from latest device location
 
 **Key Features - v_agg_akkio_hh:**
 - Household-level grain (AKKIO_HH_ID)
 - Fixed weight value of 1 per requirements
-- Home ownership, household income, and income bracket
+- Home ownership (1/0/NULL), household income (in dollars: HOUSEHOLD_INCOME_K * 1000), and income bracket
+- Presence of children indicator (1/0) derived from HAS_CHILDREN_0_18
 - Clustered by (PARTITION_DATE, AKKIO_HH_ID)
 
 **Key Features - v_agg_akkio_ind:**
 - Individual-level grain (AKKIO_ID)
 - Fixed weight value of 1 per requirements
-- Demographics: Gender, Age, Age Bucket
-- IP addresses aggregated from all activity tables (content, commercial, standard, campaigns)
-- Placeholder fields for future enrichment: MAIDS, EMAILS, PHONES
+- Demographics: Gender (with NULL handling → 'UNDETERMINED'), Age, Age Bucket
+- Additional attributes: ETHNICITY_PREDICTION, EDUCATION, MARITAL_STATUS (all with NULL handling)
+- State: NULL handling for empty strings → 'Unknown'
+- Household-level attributes: HOMEOWNER, INCOME (in dollars), INCOME_BUCKET
+- ZIP_CODE: Right 5 digits extracted from ZIP11
+- NET_WORTH_BUCKET: Cast to string, defaults to 'Unknown' (not available in Vizio data)
+- Placeholder fields for future enrichment: MAIDS, IPS, EMAILS, PHONES (currently 0)
+- Clustered by (PARTITION_DATE, AKKIO_ID)
+
+**Key Features - v_agg_akkio_media:**
+- Individual-level grain (AKKIO_ID, PARTITION_DATE)
+- Aggregates media viewing behavior into categorical maps
+- Uses `MAP_FROM_ENTRIES(COLLECT_LIST(STRUCT(k, v)))` to create category → session count maps
+- Flattens comma-separated genres using `LATERAL VIEW EXPLODE(SPLIT(GENRE, ','))`
+- Maps provided: TITLES_WATCHED, GENRES_WATCHED, NETWORKS_WATCHED, INPUT_DEVICES_WATCHED, APP_SERVICES_WATCHED
+- Handles NULL values by converting to 'unknown' category
 - Clustered by (PARTITION_DATE, AKKIO_ID)
 
 ## Data Transformations
 
 ### Common Patterns Across All Models:
-1. **Text Standardization**: `lower(replace(column, ' ', '-'))` for all text fields
-2. **Partition Date**: Uses `date_partition` from source tables
-3. **TV_ID**: Maps from `hash` field in source tables
-4. **Timezone Enrichment**: All detail tables join with `mk_akkio_tvtimezone_mapping` to add device timezone
-5. **Clustering**: All tables clustered by `(partition_date, tv_id)` for query performance
-6. **Array Fields**: Summary tables use `collect_set()` for unique value arrays
-7. **String Lists**: Pipe-delimited strings using `string_agg(DISTINCT column, '|')`
-8. **Genre Handling**: Special handling for semicolon-separated genre values with array flattening
+1. **Text Standardization**: 
+   - Most text fields: `lower(replace(column, ' ', '-'))`
+   - Input device names: `lower(replace(column, ' ', '_'))`
+   - Input categories: `upper(replace(column, ' ', '-'))`
+   - Commercial brand/title: Advanced regex cleaning with special character removal
+2. **Partition Date**: Uses `date_partition` from source tables, mapped to `PARTITION_DATE` in output
+3. **TV_ID/AKKIO_ID**: Maps from `hash` field in source tables to `AKKIO_ID` in output (optimized - same value)
+4. **Timezone Enrichment**: All detail tables join with `mk_akkio_tvtimezone_mapping` on hash to add device timezone (LEFT JOIN)
+5. **Clustering**: All tables clustered by date and device ID for query performance (post-hook)
+6. **String Lists**: Comma-delimited strings using `string_agg(DISTINCT column, ',')`
+7. **Genre Handling**: Special handling for comma-separated genre values:
+   - Content summary: `array_join(ARRAY_DISTINCT(flatten(ARRAY_AGG(SPLIT(GENRE, ',')))), ',')`
+   - Genre normalization: replaces ', ' with ',' before processing
+8. **NULL Filtering**: All models filter out NULL device identifiers
+9. **Incremental Processing**: Detail tables use incremental materialization with merge strategy where applicable
 
 ## Schema Documentation
 
@@ -146,10 +195,18 @@ The `schema.yml` file includes:
 ## Data Quality
 
 ### Built-in Filters:
-- All models filter out NULL TV_IDs
-- Content models filter out NULL show titles
-- Commercial data includes all valid creative IDs
-- Standard models include all device activity
+- **All Models**: Filter out NULL device identifiers (hash/TV_ID/AKKIO_ID)
+- **Content Models**: 
+  - Filter out NULL show titles
+  - Minimum viewing duration: sessions must be > 10 seconds
+- **Commercial Models**: 
+  - Filter out ads with duration <= 0
+  - Includes all valid creative IDs (even without category mappings)
+- **Standard Models**: 
+  - Aggregates multiple sessions per device per day into one record
+  - Sums total activity seconds across all sessions
+- **Campaign Models**: Filter out NULL device identifiers (hashed_tvid)
+- **Demographic Models**: Filter out NULL device hashes, uses latest location per device
 
 ### Data Tests:
 - `not_null` tests on PARTITION_DATE and TV_ID for all models
@@ -166,12 +223,16 @@ Sources (Delta Share)
 ├─ Summary Models (content, commercial, standard)
 │
 ├─ Campaign Models (nothing_bundt_cakes, farm_bureau_financial_services)
+│    └─ Depends on: v_akkio_attributes_latest (for location enrichment)
 │
 └─ Attributes Models
      └─ v_akkio_attributes_latest
+          │    └─ Depends on: production_r2081_ipage (for location)
           ↓
      ├─ v_agg_akkio_hh (household aggregation)
-     └─ v_agg_akkio_ind (individual aggregation, depends on detail tables for IPs)
+     ├─ v_agg_akkio_ind (individual aggregation)
+     └─ v_agg_akkio_media (media aggregation)
+          └─ Depends on: vizio_daily_fact_content_detail
 ```
 
 Build with: `dbt build --models vizio`
