@@ -454,9 +454,9 @@ models:
           - not_null
           - unique
       - name: GENDER
-        description: Gender of primary viewer | :ml-encoding-nominal |<
+        description: Gender of primary viewer | :ml-encoding-nominal :audience_preview_data:yes:|<
       - name: AGE
-        description: Age of primary viewer (lower bound of age range bucket)
+        description: Age of primary viewer (lower bound of age range bucket) | :audience_preview_data:yes:|<
         data_tests:
           - dbt_utils.accepted_range:
               min_value: 18
@@ -465,17 +465,17 @@ models:
       - name: AGE_BUCKET
         description: Age range bucket code | :akkio-ml-ignore |<
       - name: EDUCATION_LEVEL
-        description: Highest education level attained 
+        description: Highest education level attained | :audience_preview_data:yes:|<
       - name: ETHNICITY
         description: Ethnicity classification | :ml-encoding-nominal |<
       - name: SPANISH_LANGUAGE
         description: Spanish language preference indicator
       - name: MARITAL_STATUS
-        description: Marital status
+        description: Marital status | :audience_preview_data:yes:|<
       - name: HOME_OWNERSHIP
-        description: Home ownership status
+        description: Home ownership status | :audience_preview_data:yes:|<
       - name: HOUSEHOLD_INCOME_K
-        description: Household income in thousands (lower bound of income range)
+        description: Household income in thousands (lower bound of income range) | :audience_preview_data:yes:|<
         data_tests:
           - dbt_utils.accepted_range:
               min_value: 0
