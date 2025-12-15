@@ -170,7 +170,7 @@ models:
       - name: DMA
         description: Designated Market Area codes where TV was used
       - name: CREATIVE_ID_STR_LIST
-        description: Comma separated list of Creative IDs for ads viewed | :lower :space-to-hyphen :csv        
+        description: Comma separated list of Creative IDs for ads viewed | :csv        
       - name: BRAND_NAME_STR_LIST
         description: Comma separated list of brands of ads viewed | :lower :space-to-hyphen :csv
       - name: AD_TITLE_STR_LIST
@@ -178,7 +178,7 @@ models:
       - name: COMMERCIAL_CATEGORY_STR_LIST
         description: Comma separated list of commercial categories viewed | :lower :space-to-hyphen :csv
       - name: INPUT_CATEGORY_STR_LIST
-        description: Comma separated list of input device categories used | :lower :space-to-hyphen :csv
+        description: Comma separated list of input device categories used | :csv
       - name: INPUT_DEVICE_STR_LIST
         description: Comma separated list of input devices used | :lower :space-to-underscore :csv
       - name: APP_SERVICE_STR_LIST
@@ -270,7 +270,7 @@ models:
       - name: SESSION_TYPE
         description: Viewing session type indicator
       - name: INPUT_CATEGORY
-        description: Category of the input device generating the data | :lower :space-to-hyphen
+        description: Category of the input device generating the data
       - name: INPUT_DEVICE_NAME
         description: Name of the input device generating the data | :lower :space-to-underscore
       - name: APP_SERVICE
