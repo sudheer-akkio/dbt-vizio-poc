@@ -267,8 +267,8 @@ models:
         description: Callsign of network for next content | :lower :space-to-hyphen
       - name: NEXT_NETWORK
         description: Network affiliate for next content | :lower :space-to-hyphen
-      - name: SESSION_TYPE
-        description: Viewing session type indicator
+      - name: LIVE
+        description: Boolean value 't' or 'f' to indicate whether the viewing session is live or not respectively. (t as True, f as False)
       - name: INPUT_CATEGORY
         description: Category of the input device generating the data
       - name: INPUT_DEVICE_NAME

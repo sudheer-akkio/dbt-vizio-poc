@@ -137,7 +137,7 @@ FFFFFF (white - empty space, overlap between sources, etc)
 ## **5. Business Rules & Data Definitions**
 
 ### Input Category / Source Classification
-- **Linear Source**: Viewing is classified as "Linear" when `INPUT_CATEGORY` is **'HD TV'** or **'SD TV'**
+- **Linear Source**: Viewing is classified as "Linear" **ONLY** when `INPUT_CATEGORY` is exactly **'HD TV'** or **'SD TV'** — no other values qualify as Linear. Any other `INPUT_CATEGORY` value must be excluded from Linear analysis.
 - **Streaming Source**: All other `INPUT_CATEGORY` values (typically smart TV apps/streaming services)
 - `APP_SERVICE` provides additional detail on the specific streaming app or service used
 
@@ -173,7 +173,7 @@ When analyzing **consecutive viewing** (e.g., "viewers who watched sports for 5 
 > Do not assume an approach—seek clarification before proceeding with the query.
 
 ### Live vs. Time-Shifted Viewing
-- `WATCHED_LIVE` (content tables) and `SESSION_TYPE` (commercial/campaign tables) indicate whether content was watched live or via DVR/time-shifted viewing
+- `WATCHED_LIVE` (content tables) and `LIVE` (commercial/campaign tables) indicate whether content was watched live or via DVR/time-shifted viewing
 - Use this to analyze real-time versus delayed audience behavior
 
 ### Campaign Data Indicators

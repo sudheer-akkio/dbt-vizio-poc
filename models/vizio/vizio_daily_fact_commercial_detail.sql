@@ -90,7 +90,7 @@ enriched_commercial AS (
         c.next_ts_end AS NEXT_CONTENT_END_TIME_UTC,
         lower(replace(c.next_channel_callsign, ' ', '-')) AS NEXT_CALLSIGN,
         lower(replace(c.next_network_affiliate, ' ', '-')) AS NEXT_NETWORK,
-        c.live AS SESSION_TYPE,
+        c.live AS LIVE,
         c.input_category AS INPUT_CATEGORY,
         lower(replace(c.input_device, ' ', '_')) AS INPUT_DEVICE_NAME, -- data in this col already has underscore seperators
         lower(replace(c.app_service, ' ', '-')) AS APP_SERVICE
